@@ -10,6 +10,7 @@ import type {
   FilterRulesUpdate,
   GroupUpdate,
   GuildMotd,
+  GuildRankNames,
   GuildRoster,
   InspectAnswer,
   Item,
@@ -157,6 +158,9 @@ export class SpawnStore {
   // in the popout GuildWindow. undefined until the respective packet arrives.
   private guildRoster: GuildRoster | undefined;
   private guildMotd: GuildMotd | undefined;
+  // The guild's rank ordinal -> label table (OP_ExpandedGuildInfo). Guilds
+  // rename ranks freely, so a member's numeric rank only means something here.
+  private guildRankNames: Map<number, string> | undefined;
   private buffs: BuffsUpdate | undefined;
   // Last full snapshot of the player's effects on mobs (DoTs/debuffs), keyed
   // per-Buff by target_id. effectsFor(id) filters to one spawn.
@@ -400,6 +404,15 @@ export class SpawnStore {
       case 'guildMotd':
         this.guildMotd = p.value;
         break;
+      case 'guildRankNames': {
+        // Parallel arrays (rank_ids[i] -> names[i]); each send is the full known
+        // table, so replace wholesale.
+        const v = p.value as GuildRankNames;
+        const m = new Map<number, string>();
+        v.rankIds.forEach((id, i) => m.set(id, v.names[i] ?? ''));
+        this.guildRankNames = m;
+        break;
+      }
       case 'buffs':
         this.buffs = p.value;
         break;
@@ -583,6 +596,9 @@ export class SpawnStore {
   groupState(): GroupUpdate | undefined { return this.group; }
   guildRosterState(): GuildRoster | undefined { return this.guildRoster; }
   guildMotdState(): GuildMotd | undefined { return this.guildMotd; }
+  // Server-provided label for a numeric guild rank, or undefined if the
+  // rank-name table hasn't arrived (or lacks that ordinal).
+  guildRankName(rank: number): string | undefined { return this.guildRankNames?.get(rank); }
   buffsState(): BuffsUpdate | undefined { return this.buffs; }
   // The last effects snapshot (for its captured_ms) + the effects on one mob.
   spawnEffectsState(): SpawnEffectsUpdate | undefined { return this.spawnEffects; }

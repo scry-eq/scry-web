@@ -2,10 +2,11 @@ import { FloatingWindow } from './FloatingWindow';
 import { classDisplay } from './classes';
 import type { SpawnStore } from '../state/store';
 
-// Guild rank ids from the wire: 0 member, 1 officer, 2 leader.
-const RANK_LABEL = ['Member', 'Officer', 'Leader'] as const;
-function rankLabel(rank: number): string {
-  return RANK_LABEL[rank] ?? `Rank ${rank}`;
+// Rank labels come from the server (OP_ExpandedGuildInfo) — guilds rename their
+// ranks freely — via store.guildRankName(). Until that table arrives, fall back
+// to the numeric ordinal.
+function rankLabel(store: SpawnStore, rank: number): string {
+  return store.guildRankName(rank) ?? `Rank ${rank}`;
 }
 
 // last_on is unix seconds (0 = never). A member in a zone (zone_id != 0) is
@@ -94,7 +95,7 @@ export function GuildWindow({
                     <td className="px-1 py-0.5" title={classDisplay(m.classMask, m.class)}>
                       {classDisplay(m.classMask, m.class, { short: true })}
                     </td>
-                    <td className="px-2 py-0.5">{rankLabel(m.rank)}</td>
+                    <td className="px-2 py-0.5">{rankLabel(store, m.rank)}</td>
                     <td className="px-2 py-0.5">
                       {m.zoneId !== 0 ? (
                         <span className="text-green-500">Online</span>
