@@ -28,6 +28,7 @@ if [[ -d proto ]]; then
                 exit 1
             fi
         fi
+        echo "pre-push: proto submodule in sync (${SUB:0:12})"
     else
         echo "pre-push: WARN could not fetch proto origin — submodule-sync check skipped" >&2
     fi
