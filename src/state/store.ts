@@ -9,6 +9,8 @@ import type {
   EqTimeSync,
   FilterRulesUpdate,
   GroupUpdate,
+  GuildMotd,
+  GuildRoster,
   InspectAnswer,
   Item,
   ItemCacheTotals,
@@ -151,6 +153,10 @@ export class SpawnStore {
   private geometry: MapGeometry | undefined;
   private playerStats: PlayerStats | undefined;
   private group: GroupUpdate | undefined;
+  // The player's guild roster + MOTD (eql; both replaced wholesale). Rendered
+  // in the popout GuildWindow. undefined until the respective packet arrives.
+  private guildRoster: GuildRoster | undefined;
+  private guildMotd: GuildMotd | undefined;
   private buffs: BuffsUpdate | undefined;
   // Last full snapshot of the player's effects on mobs (DoTs/debuffs), keyed
   // per-Buff by target_id. effectsFor(id) filters to one spawn.
@@ -388,6 +394,12 @@ export class SpawnStore {
       case 'group':
         this.group = p.value;
         break;
+      case 'guildRoster':
+        this.guildRoster = p.value;
+        break;
+      case 'guildMotd':
+        this.guildMotd = p.value;
+        break;
       case 'buffs':
         this.buffs = p.value;
         break;
@@ -569,6 +581,8 @@ export class SpawnStore {
     }
   }
   groupState(): GroupUpdate | undefined { return this.group; }
+  guildRosterState(): GuildRoster | undefined { return this.guildRoster; }
+  guildMotdState(): GuildMotd | undefined { return this.guildMotd; }
   buffsState(): BuffsUpdate | undefined { return this.buffs; }
   // The last effects snapshot (for its captured_ms) + the effects on one mob.
   spawnEffectsState(): SpawnEffectsUpdate | undefined { return this.spawnEffects; }

@@ -136,6 +136,7 @@ export function PlayerPanel({
   onOpenLoot,
   onOpenItems,
   onOpenAA,
+  onOpenGuild,
 }: {
   store: SpawnStore;
   tick: number;
@@ -144,6 +145,7 @@ export function PlayerPanel({
   onOpenLoot?: () => void;
   onOpenItems?: () => void;
   onOpenAA?: () => void;
+  onOpenGuild?: () => void;
 }) {
   // tick is just a dependency so the panel re-reads after each store apply.
   void tick;
@@ -171,6 +173,7 @@ export function PlayerPanel({
           {onOpenStats && <PanelButton label="Stats" onClick={onOpenStats} />}
           {onOpenSkills && <PanelButton label="Skills" onClick={onOpenSkills} />}
           {onOpenAA && <PanelButton label="AA" onClick={onOpenAA} />}
+          {onOpenGuild && <PanelButton label="Guild" onClick={onOpenGuild} />}
           {onOpenLoot && <PanelButton label="Loot" onClick={onOpenLoot} />}
           {onOpenItems && <PanelButton label="Items" onClick={onOpenItems} />}
         </div>

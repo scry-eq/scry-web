@@ -42,6 +42,7 @@ import { SpawnPointList } from './SpawnPointList';
 import { PlayerPanel } from './PlayerPanel';
 import { LootWindow } from './LootWindow';
 import { AAWindow } from './AAWindow';
+import { GuildWindow } from './GuildWindow';
 import { SkillsWindow } from './SkillsWindow';
 import { StatsWindow } from './StatsWindow';
 import { TargetWindow } from './TargetWindow';
@@ -201,6 +202,7 @@ export function App() {
   const [filtersOpen, setFiltersOpen] = useState(false);
   const [skillsOpen, setSkillsOpen] = useState(false);
   const [aaWindowOpen, setAAWindowOpen] = useState(false);
+  const [guildWindowOpen, setGuildWindowOpen] = useState(false);
   const [statsWindowOpen, setStatsWindowOpen] = useState(false);
   const [targetWindowOpen, setTargetWindowOpen] = useState(false);
   const [inventoryOpen, setInventoryOpen] = useState(false);
@@ -519,6 +521,7 @@ export function App() {
             onOpenSkills={() => setSkillsOpen((v) => !v)}
             onOpenStats={() => setStatsWindowOpen((v) => !v)}
             onOpenAA={() => setAAWindowOpen((v) => !v)}
+            onOpenGuild={() => setGuildWindowOpen((v) => !v)}
             onOpenLoot={() => setLootOpen((v) => !v)}
             onOpenItems={() => setInventoryOpen((v) => !v)}
           />
@@ -815,6 +818,13 @@ export function App() {
           store={store}
           tick={tick}
           onClose={() => setAAWindowOpen(false)}
+        />
+      )}
+      {guildWindowOpen && (
+        <GuildWindow
+          store={store}
+          tick={tick}
+          onClose={() => setGuildWindowOpen(false)}
         />
       )}
       {statsWindowOpen && (
