@@ -1,0 +1,50 @@
+#!/usr/bin/env bash
+# Pre-push: keep the proto submodule + generated TS in sync with canonical
+# showeq-proto, then typecheck.
+# Bypass with: git push --no-verify
+set -euo pipefail
+REPO="$(git rev-parse --show-toplevel)"
+cd "${REPO}"
+
+[[ -d "${HOME}/.bun/bin" ]] && export PATH="${HOME}/.bun/bin:${PATH}"
+
+# ── Proto submodule sync: reachable on origin/proto AND not behind canonical.
+# Fetch first — a stale cached origin/main misleads the comparison.
+if [[ -d proto ]]; then
+    if git -C proto fetch -q origin 2>/dev/null; then
+        SUB="$(git rev-parse HEAD:proto)"
+        CANON="$(git -C proto rev-parse origin/main)"
+        if [[ "${SUB}" != "${CANON}" ]]; then
+            if git -C proto merge-base --is-ancestor "${SUB}" "${CANON}"; then
+                echo "" >&2
+                echo "ERROR: proto submodule is BEHIND canonical origin/proto." >&2
+                echo "       Bump: (cd proto && git fetch origin && git checkout origin/main) && git add proto" >&2
+                echo "       then 'bun run gen' and commit." >&2
+                exit 1
+            else
+                echo "" >&2
+                echo "ERROR: proto submodule ${SUB:0:12} is not on origin/proto main." >&2
+                echo "       Push showeq-proto FIRST (cross-repo order: proto -> daemon -> web)." >&2
+                exit 1
+            fi
+        fi
+    else
+        echo "pre-push: WARN could not fetch proto origin — submodule-sync check skipped" >&2
+    fi
+fi
+
+# ── Generated TS must match a fresh gen from the submodule.
+if command -v bun >/dev/null 2>&1; then
+    echo "pre-push: verifying src/gen is fresh (bun run gen)..."
+    bun run gen >/dev/null 2>&1 || echo "pre-push: WARN 'bun run gen' failed — gen check skipped" >&2
+    if ! git diff --quiet -- src/gen 2>/dev/null; then
+        git checkout -- src/gen 2>/dev/null || true
+        echo "" >&2
+        echo "ERROR: src/gen is stale vs the proto submodule — run 'bun run gen' and commit." >&2
+        exit 1
+    fi
+    echo "pre-push: typecheck..."
+    bun run typecheck
+else
+    echo "pre-push: WARN bun not on PATH — gen/typecheck skipped" >&2
+fi
