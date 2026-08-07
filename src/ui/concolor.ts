@@ -1,17 +1,18 @@
-// EQ con-color rules relative to a player level, ported to match the legacy
-// client's Player::fillConTable (showeq/src/player.cpp) — and verified
-// against the live client (a guild-hall dummy at known levels).
+// EQ con-color bands, derived from the client's own runtime con table.
 //
-// Real EQ con is a flat level-delta band:
-//   +4 or more : red        +1..+3 : yellow       even : white
-//   -1..-5     : dark blue   -6..-15 : light blue
-//   -16..-20   : green       -21 or more : grey
-// ...but at low player levels there isn't room below you for the lower
-// bands, so they compress: the grey/green thresholds scale with your level
-// (the bucket table in conRanges), while dark-blue (-1..-5) and light-blue
-// (ceiling level-6) stay fixed. e.g. at level 7 a level-1 mob (delta -6)
-// cons GREY, not light blue, and lvls 2-6 are dark blue — exactly what the
-// live client shows. By level 57 the table reaches the uncompressed bands.
+// The client builds a 131x131 int8 table at startup and indexes it as
+// [myLevel][targetLevel]; its builder reduces to the closed form below.
+//
+// Above the player the bands are flat: +1..+5 yellow, +6 and up red.
+// Below the player they compress with level — the light-blue and grey bases
+// scale as 3/4 and 2/3 of the player level until 60, then flatten to -15 and
+// -20 — and each base clamps against the band above it, so a band vanishes
+// once there is no room for it. That clamping is why low levels show no
+// green or light blue at all: at level 10, 5-9 is dark blue and 1-4 grey.
+//
+// This replaced a hand-tuned per-level ladder ported from the legacy
+// Player::fillConTable, which capped yellow at +3 and disagreed with the
+// client at 19 player levels (one-level errors at the grey/green edge).
 
 export type Con =
   | 'gray'
@@ -32,55 +33,28 @@ const CON_HEX: Record<Con, string> = {
   red:    '#ff3030',
 };
 
-// Per-level grey/green band offsets, identical to the legacy fillConTable
-// bucket ladder. grayRange/greenRange are added to the player level to get
-// the highest spawn level that cons grey / green respectively.
-function conRanges(level: number): { grayRange: number; greenRange: number } {
-  if (level < 15) return { grayRange: -6,  greenRange: -14 };
-  if (level < 17) return { grayRange: -7,  greenRange: -5  };
-  // 17-20: live shows grey up to level-7 (e.g. at L18, 11 cons grey and 12
-  // green). The legacy fillConTable used -8 here, which greyed only up to
-  // level-8 (L18 → 11 green); corrected to -7 against the live client.
-  if (level < 21) return { grayRange: -7,  greenRange: -6  };
-  // 21-24: same off-by-one — live greys to level-8 (at L21, 13 cons grey, 14
-  // green). Legacy used -9 (L21 → 13 green); corrected to -8.
-  if (level < 25) return { grayRange: -8,  greenRange: -7  };
-  if (level < 29) return { grayRange: -10, greenRange: -8  };
-  if (level < 33) return { grayRange: -11, greenRange: -9  };
-  if (level < 37) return { grayRange: -13, greenRange: -10 };
-  if (level < 41) return { grayRange: -14, greenRange: -11 };
-  if (level < 45) return { grayRange: -16, greenRange: -12 };
-  if (level < 49) return { grayRange: -17, greenRange: -13 };
-  if (level < 53) return { grayRange: -18, greenRange: -14 };
-  if (level < 57) return { grayRange: -20, greenRange: -15 };
-  return { grayRange: -21, greenRange: -16 };
-}
-
 export function conOf(playerLevel: number, spawnLevel: number): Con {
   if (!playerLevel || !spawnLevel) return 'white';
 
-  // At or above the player's level the bands are fixed (no compression).
   const diff = spawnLevel - playerLevel;
-  if (diff >= 4) return 'red';
+  if (diff >= 6) return 'red';
   if (diff >= 1) return 'yellow';
   if (diff === 0) return 'white';
 
-  // Below the player, walk the same ordered ceilings fillConTable fills.
-  // Because each band only claims spawn levels the previous bands didn't,
-  // testing the ceilings in order grey -> green -> light-blue -> dark-blue
-  // makes the lower bands compress out whenever a ceiling lands at or above
-  // the spawn level (e.g. at low levels grayCeil swallows the light-blue
-  // and green ranges entirely).
-  const { grayRange, greenRange } = conRanges(playerLevel);
-  const grayCeil  = grayRange + playerLevel;  // grey:       1 .. grayCeil
-  const greenCeil = greenRange + playerLevel; // green:        .. greenCeil
-  const cyanCeil  = playerLevel - 6;          // light blue:   .. level-6
-  // dark blue fills the rest (level-5 .. level-1).
+  // Lowest spawn level that cons light blue / green.
+  const cyanBase = Math.min(
+    playerLevel <= 60 ? Math.floor((3 * playerLevel) / 4) : playerLevel - 15,
+    playerLevel - 5,
+  );
+  const greenBase = Math.min(
+    playerLevel <= 60 ? Math.floor((2 * playerLevel) / 3) : playerLevel - 20,
+    cyanBase,
+  );
 
-  if (spawnLevel <= grayCeil)  return 'gray';
-  if (spawnLevel <= greenCeil) return 'green';
-  if (spawnLevel <= cyanCeil)  return 'cyan';
-  return 'blue';
+  if (spawnLevel >= playerLevel - 5) return 'blue';
+  if (spawnLevel >= cyanBase) return 'cyan';
+  if (spawnLevel >= greenBase) return 'green';
+  return 'gray';
 }
 
 export function conHex(c: Con): string {

@@ -7,11 +7,13 @@ describe('conOf', () => {
     expect(conOf(10, 0)).toBe('white');
   });
 
+  // The client's con table yellows +1..+5 and reds at +6.
   it('uses fixed bands at/above the player level', () => {
     expect(conOf(20, 20)).toBe('white');  // even
     expect(conOf(20, 21)).toBe('yellow'); // +1
     expect(conOf(20, 23)).toBe('yellow'); // +3
-    expect(conOf(20, 24)).toBe('red');    // +4
+    expect(conOf(20, 25)).toBe('yellow'); // +5
+    expect(conOf(20, 26)).toBe('red');    // +6
     expect(conOf(20, 30)).toBe('red');
   });
 
@@ -50,6 +52,18 @@ describe('conOf', () => {
     expect(conOf(21, 14)).toBe('green');
     expect(conOf(21, 15)).toBe('cyan'); // delta -6, light blue
     expect(conOf(21, 16)).toBe('blue'); // delta -5, dark blue
+  });
+
+  // Levels where the old hand-tuned ladder disagreed with the client table
+  // by one at the grey/green edge. L15 has no room for green at all (both
+  // bases land on 10), and L28 greens from 18 rather than 19.
+  it('matches the client table at the grey/green edge', () => {
+    expect(conOf(15, 9)).toBe('gray');
+    expect(conOf(15, 10)).toBe('blue');
+    expect(conOf(28, 17)).toBe('gray');
+    expect(conOf(28, 18)).toBe('green');
+    expect(conOf(28, 20)).toBe('green');
+    expect(conOf(28, 21)).toBe('cyan');
   });
 
   // By level 57+ the table reaches the uncompressed flat formula:
