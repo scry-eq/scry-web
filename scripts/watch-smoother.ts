@@ -33,35 +33,58 @@ console.log('Page loaded. Watching smoother (Ctrl-C to stop).\n');
 await page.evaluate(() => {
   (window as any).__smootherLog = [];
 
-  function findFiberRoot(): any {
-    const container = document.getElementById('root');
-    if (!container) return null;
-    const key = Object.keys(container).find(k => k.startsWith('__reactFiber'));
-    return key ? (container as any)[key] : null;
+  // React tags the ROOT CONTAINER with __reactContainer$… and every rendered
+  // ELEMENT with __reactFiber$…. #root is a container, so searching it for
+  // __reactFiber$ alone finds nothing and the whole walk silently yields null.
+  // Accept either key, and normalize: a Fiber has a numeric .tag, while a
+  // FiberRootNode wraps the fiber in .current.
+  function fiberFromNode(node: Element | null): any {
+    if (!node) return null;
+    const key = Object.keys(node).find(
+      k => k.startsWith('__reactFiber$') || k.startsWith('__reactContainer$'),
+    );
+    if (!key) return null;
+    const val = (node as any)[key];
+    return typeof val?.tag === 'number' ? val : (val?.current ?? val);
+  }
+
+  // The smoother is a useRef whose .current holds the positions Map.
+  function smootherIn(fiber: any): any {
+    let state = fiber?.memoizedState;
+    while (state) {
+      const val = state.memoizedState;
+      if (val && typeof val === 'object' && val.current &&
+          val.current.positions instanceof Map) {
+        const first = val.current.positions.values().next().value;
+        if (first && 'targetX' in first) return val.current;
+      }
+      state = state.next;
+    }
+    return null;
   }
 
   function findSmoother(): any {
-    let smoother: any = null;
-    function walk(fiber: any) {
-      if (!fiber || smoother) return;
-      let state = fiber.memoizedState;
-      while (state) {
-        const val = state.memoizedState;
-        if (val && typeof val === 'object' && val.current &&
-            val.current.positions instanceof Map) {
-          const first = val.current.positions.values().next().value;
-          if (first && 'targetX' in first) {
-            smoother = val.current;
-            return;
-          }
-        }
-        state = state.next;
-      }
+    // 1. Walk the whole tree down from the root container.
+    let found: any = null;
+    (function walk(fiber: any) {
+      if (!fiber || found) return;
+      found = smootherIn(fiber);
+      if (found) return;
       walk(fiber.child);
       walk(fiber.sibling);
+    })(fiberFromNode(document.getElementById('root')));
+    if (found) return found;
+
+    // 2. Fallback: up the .return chain from the canvas. MapCanvas owns the
+    //    ref and is an ANCESTOR of the canvas element, so a downward walk
+    //    from there would miss it.
+    let fiber = fiberFromNode(document.querySelector('canvas'));
+    while (fiber) {
+      const sm = smootherIn(fiber);
+      if (sm) return sm;
+      fiber = fiber.return;
     }
-    walk(findFiberRoot());
-    return smoother;
+    return null;
   }
 
   // prev snapshot: id → { x, y, seenAt }
@@ -82,7 +105,9 @@ await page.evaluate(() => {
         const dist = Math.hypot(pos.targetX - p.x, pos.targetY - p.y);
         const dt = now - p.seenAt;
         const log: any[] = (window as any).__smootherLog;
-        log.push({ id, dist, dt, dur: pos.durationMs, x: pos.targetX, y: pos.targetY });
+        // SmoothedPos carries intervalMs (the interpolation window); an older
+        // durationMs field no longer exists and read as undefined every line.
+        log.push({ id, dist, dt, interval: pos.intervalMs, x: pos.targetX, y: pos.targetY });
         if (log.length > 2000) log.splice(0, 500);
         prev.set(id, { x: pos.targetX, y: pos.targetY, seenAt: now });
       }
@@ -118,7 +143,8 @@ const drain = async () => {
     const flag = e.dist >= 150 ? ' *** SNAP ***' : e.dist >= 30 ? ' !! large' : '';
     console.log(
       `id=${String(e.id).padStart(5)}  dist=${String(e.dist.toFixed(1)).padStart(7)}  ` +
-      `dt=${String(e.dt.toFixed(0)).padStart(5)}ms  dur=${String(e.dur).padStart(4)}ms${flag}`
+      `dt=${String(e.dt.toFixed(0)).padStart(5)}ms  ` +
+      `int=${String(e.interval != null ? Math.round(e.interval) : '?').padStart(4)}ms${flag}`
     );
   }
 
