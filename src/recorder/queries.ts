@@ -5,7 +5,7 @@
 export interface LootRecord {
   id: number;
   ts: number;
-  source: 'message' | 'window';
+  source: 'message' | 'window' | 'coin';
   item_name: string;
   item_id: number | null;
   icon: number | null;

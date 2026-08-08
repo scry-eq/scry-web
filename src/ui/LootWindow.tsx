@@ -21,11 +21,38 @@ function formatMoney(m: MoneyTotals): string {
   return parts.length > 0 ? parts.join(' ') : '0c';
 }
 
+// Carrying split of a single amount — unlike the session MoneyTotals, which
+// deliberately sums each denomination without carrying.
+function formatCopper(copper: number): string {
+  const parts: string[] = [];
+  const p = Math.floor(copper / 1000);
+  const g = Math.floor(copper / 100) % 10;
+  const s = Math.floor(copper / 10) % 10;
+  const c = copper % 10;
+  if (p) parts.push(`${formatCount(p)}p`);
+  if (g) parts.push(`${g}g`);
+  if (s) parts.push(`${s}s`);
+  if (c) parts.push(`${c}c`);
+  return parts.length > 0 ? parts.join(' ') : '0c';
+}
+
+// Short tag for where an item went, for the ones that don't stay in your bags.
+function dispositionTag(d: string | null): string {
+  switch (d) {
+    case 'tradeskill depot': return 'depot';
+    case 'Dragon Hoard':     return 'hoard';
+    case 'created':          return 'combine';
+    default:                 return '';
+  }
+}
+
 type Aggregate = {
   itemName: string;
   count: number;
   yourCount: number;
   lastTs: number;
+  soldCopper: number;   // summed sale proceeds for this item this session
+  disposition: string | null;
 };
 
 export function LootWindow({
@@ -48,15 +75,19 @@ export function LootWindow({
     const a = aggregates.get(e.itemName);
     const isYou = e.looter === '';
     if (a) {
-      a.count += 1;
-      if (isYou) a.yourCount += 1;
+      a.count += e.qty;
+      if (isYou) a.yourCount += e.qty;
       if (e.localTs > a.lastTs) a.lastTs = e.localTs;
+      a.soldCopper += e.soldCopper ?? 0;
+      if (e.disposition) a.disposition = e.disposition;
     } else {
       aggregates.set(e.itemName, {
         itemName: e.itemName,
-        count: 1,
-        yourCount: isYou ? 1 : 0,
+        count: e.qty,
+        yourCount: isYou ? e.qty : 0,
         lastTs: e.localTs,
+        soldCopper: e.soldCopper ?? 0,
+        disposition: e.disposition,
       });
     }
   }
@@ -101,6 +132,11 @@ export function LootWindow({
                           group
                         </span>
                       )}
+                      {dispositionTag(r.disposition) && (
+                        <span className="ml-1 text-[10px] uppercase tracking-wide text-sky-500">
+                          {dispositionTag(r.disposition)}
+                        </span>
+                      )}
                     </td>
                     <td className="py-0.5 text-right font-mono text-amber-500">
                       ×{r.count}
@@ -109,6 +145,9 @@ export function LootWindow({
                           ({r.yourCount} you)
                         </span>
                       )}
+                    </td>
+                    <td className="py-0.5 pl-2 text-right font-mono text-[11px] text-emerald-500">
+                      {r.soldCopper > 0 ? formatCopper(r.soldCopper) : ''}
                     </td>
                   </tr>
                 ))}
@@ -134,6 +173,16 @@ export function LootWindow({
                     </span>
                     {' · '}
                     {e.itemName}
+                    {e.soldCopper !== undefined && e.soldCopper > 0 && (
+                      <span className="ml-1 text-emerald-500">
+                        {formatCopper(e.soldCopper)}
+                      </span>
+                    )}
+                    {dispositionTag(e.disposition) && (
+                      <span className="ml-1 text-sky-500">
+                        {dispositionTag(e.disposition)}
+                      </span>
+                    )}
                   </span>
                 </div>
               ))

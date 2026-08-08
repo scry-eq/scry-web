@@ -64,4 +64,39 @@ describe('LootRecorderCore', () => {
     core.applyEnvelope(env({ case: 'lootTransaction', value: { corpseId: 1, itemId: 2, quantity: 1, coinCopper: 0 } }));
     expect(rows).toHaveLength(0);
   });
+
+  it('records a corpse coin pile as its own row', () => {
+    const { core, rows } = newCore();
+    core.applyEnvelope(env({ case: 'zoneChanged', value: { zoneShort: 'greatdivide' } }));
+    core.applyEnvelope(env({ case: 'lootTransaction', value: {
+      coinCopper: 2881, coinFromCorpse: true,
+    } }));
+    expect(rows).toHaveLength(1);
+    expect(rows[0]).toMatchObject({
+      source: 'coin', itemName: 'Coin', moneyCopper: 2881,
+      disposition: 'corpse_coin', sold: 0, zoneBase: 'greatdivide',
+    });
+  });
+
+  it('does not let a corpse pile consume a pending message', () => {
+    // The pile arrives at loot-window open, ahead of the item lines.
+    const { core, rows } = newCore();
+    core.applyEnvelope(env({ case: 'chat', value: {
+      chatColor: 286,
+      text: "You looted a Bronze Dagger +1 from a goblin diviner's corpse and sold it for 2 gold.",
+    } }));
+    core.applyEnvelope(env({ case: 'lootTransaction', value: { coinCopper: 2881, coinFromCorpse: true } }));
+    core.applyEnvelope(env({ case: 'lootTransaction', value: {
+      corpseId: 18632, itemId: 7012, quantity: 1, coinCopper: 200,
+    } }));
+    expect(rows).toHaveLength(2);
+    expect(rows[0]).toMatchObject({ source: 'coin', moneyCopper: 2881 });
+    expect(rows[1]).toMatchObject({ itemName: 'Bronze Dagger +1', moneyCopper: 200, sold: 1 });
+  });
+
+  it('records a coinless corpse pile as nothing', () => {
+    const { core, rows } = newCore();
+    core.applyEnvelope(env({ case: 'lootTransaction', value: { coinCopper: 0, coinFromCorpse: true } }));
+    expect(rows).toHaveLength(0);
+  });
 });

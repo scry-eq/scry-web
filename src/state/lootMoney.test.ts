@@ -91,3 +91,72 @@ describe('auto-sell loot lines', () => {
     expect(store.moneyTotal()).toEqual(ZERO);
   });
 });
+
+// Verbatim lines from eqlegends-loot2 (2026-08-08); the two sales below are the
+// ones whose wire amounts read 200 and 114.
+const SOLD_2G =
+  "You looted a Bronze Dagger +1 from a goblin diviner's corpse and sold it for 2 gold.";
+const SOLD_1G1S4C =
+  "You looted a Cloth Veil +1 from a goblin diviner's corpse and sold it for 1 gold, 1 silver and 4 copper.";
+const DEPOT =
+  "You looted 2 Bone Chips from a decaying skeleton's corpse and stored it in your tradeskill depot";
+const HOARD =
+  "You looted a Diamond Dust from an ice giant's corpse and stored it in your Dragon Hoard";
+const CREATED =
+  "You looted a Throwing Boulder from an ice giant diplomat's corpse to create a Throwing Boulder +8";
+
+function corpseCoinEnvelope(seq: bigint, coinCopper: number) {
+  return create(EnvelopeSchema, {
+    seq,
+    payload: {
+      case: 'lootTransaction',
+      value: create(LootTransactionSchema, { coinCopper, coinFromCorpse: true }),
+    },
+  });
+}
+
+describe('session loot window', () => {
+  it('pairs a sale amount with the item it came from', () => {
+    const store = new SpawnStore();
+    store.apply(chatEnvelope(1n, SOLD_2G));
+    store.apply(lootTxnEnvelope(2n, 200));
+    store.apply(chatEnvelope(3n, SOLD_1G1S4C));
+    store.apply(lootTxnEnvelope(4n, 114));
+    expect(store.lootEntries().map((e) => [e.itemName, e.soldCopper])).toEqual([
+      ['Bronze Dagger +1', 200],
+      ['Cloth Veil +1', 114],
+    ]);
+  });
+
+  it('does not pay a corpse pile to a pending sale', () => {
+    // Corpse coin arrives at loot-window open, before the item lines.
+    const store = new SpawnStore();
+    store.apply(chatEnvelope(1n, SOLD_2G));
+    store.apply(corpseCoinEnvelope(2n, 2881));
+    store.apply(lootTxnEnvelope(3n, 200));
+    expect(store.lootEntries()[0].soldCopper).toBe(200);
+    // Both amounts still reach the purse: EQL auto-takes corpse coin.
+    expect(store.moneyTotal()).toEqual({
+      platinum: 2, gold: 10, silver: 8, copper: 1,
+    });
+  });
+
+  it('leaves an unsold item with no sale amount', () => {
+    const store = new SpawnStore();
+    store.apply(chatEnvelope(1n, DEPOT));
+    store.apply(corpseCoinEnvelope(2n, 62));
+    expect(store.lootEntries()[0].soldCopper).toBeUndefined();
+  });
+
+  it('records where an unsold item went', () => {
+    const store = new SpawnStore();
+    store.apply(chatEnvelope(1n, DEPOT));
+    store.apply(chatEnvelope(2n, HOARD));
+    store.apply(chatEnvelope(3n, CREATED));
+    expect(store.lootEntries().map((e) => [e.itemName, e.disposition, e.qty])).toEqual([
+      ['Bone Chips', 'tradeskill depot', 2],
+      ['Diamond Dust', 'Dragon Hoard', 1],
+      ['Throwing Boulder', 'created', 1],
+    ]);
+  });
+});

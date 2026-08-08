@@ -6,7 +6,7 @@ export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS loot (
   id           INTEGER PRIMARY KEY,
   ts           INTEGER NOT NULL,
-  source       TEXT    NOT NULL,           -- 'message' (OP_LootMessage) | 'window' (OP_LootDrops)
+  source       TEXT    NOT NULL,           -- 'message' (OP_LootMessage) | 'window' (OP_LootDrops) | 'coin' (corpse pile)
   item_name    TEXT    NOT NULL,
   item_id      INTEGER,                    -- null until the daemon emits the link-header id
   icon         INTEGER,                    -- dragitem icon id (window path only)

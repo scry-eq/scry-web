@@ -3,7 +3,9 @@
 // consumed by the host-agnostic recorder core (core.ts), so it must stay free of
 // WebSocket / SQLite / Bun / Node imports.
 
-export type LootSource = 'message' | 'window';
+// 'coin' rows are corpse coin piles: itemName is 'Coin' and money_copper
+// carries the amount.
+export type LootSource = 'message' | 'window' | 'coin';
 
 // One persisted loot event. `source='message'` is the authoritative "loot I
 // acquired" record (with disposition + money); `source='window'` is the corpse

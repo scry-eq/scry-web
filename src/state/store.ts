@@ -25,6 +25,9 @@ import type {
   WornSet,
   ZoneServer,
 } from '@gen/seq/v1/events_pb';
+// EQL loot wording (all four dispositions). Shared with the SQLite recorder so
+// the session window and the DB can never disagree about a line.
+import { parseEqlLootMessage } from '../recorder/loot';
 
 // One chat-log line: the wire ChatMessage plus the seq the daemon used,
 // so the React render key is stable across re-renders.
@@ -77,6 +80,13 @@ export type LootEntry = {
   itemName: string;
   looter: string;
   localTs: number;
+  qty: number;
+  // Where the item went: 'sold' | 'inventory' | 'created' | a storage
+  // destination ('tradeskill depot', 'Dragon Hoard'). null on backends whose
+  // loot line says nothing about it.
+  disposition: string | null;
+  // Sale proceeds, filled in from the LootTransaction that follows the message.
+  soldCopper?: number;
 };
 
 // Running coin total for the session. Synthesized from "You receive X
@@ -120,15 +130,6 @@ const LOOT_RX_OTHER = /^--(.+?) has looted a (.+?)--$/;
 // independently after a coarse boundary match.
 const MONEY_RX = /^You receive\s+(.+?)\s+(?:from the corpse|as your split)\.?$/;
 const MONEY_TOKEN_RX = /([\d,]+)\s+(platinum|gold|silver|copper)/g;
-// Some servers auto-sell looted items and report it in one line. Only the ITEM
-// name is taken from here — the coin rides LootTransaction.coin_copper, which
-// the daemon reads from the wire rather than from this wording.
-const SELL_RX =
-  /^You looted (?:an?\s+|\d+\s+)?(.+?) from .+? corpse and sold it for .+\.$/;
-// Same servers border the plain (unsold) loot line like the templates above but
-// name the corpse inside the border and allow a quantity prefix.
-const LOOT_RX_YOU_ALT =
-  /^--You have looted (?:an?\s+|\d+\s+)?(.+?) from .+? corpse\.--$/;
 // Window over which the XP rate is averaged. Long enough to stay stable
 // during travel/idle gaps between kills, short enough to reflect a
 // changed group/zone within a few minutes.
@@ -208,6 +209,9 @@ export class SpawnStore {
   private combat: CombatEntry[] = [];
   private skillLog: SkillLogEntry[] = [];
   private lootLog: LootEntry[] = [];
+  // Loot entry whose sale amount has not arrived yet (held by object,
+  // not index — pushLoot may splice the log).
+  private pendingSale: LootEntry | null = null;
   private lootDrops: LootDropEntry[] = [];
   private moneyTotals: MoneyTotals = { platinum: 0, gold: 0, silver: 0, copper: 0 };
   private expSamples: ExpSample[] = [];
@@ -390,9 +394,13 @@ export class SpawnStore {
         break;
       }
       case 'lootTransaction': {
-        // Sale proceeds arrive as a binary field on the loot confirmation, so
-        // the amount never has to be recovered from message wording.
+        // Coin comes off the wire, never out of message wording. A corpse pile
+        // names no item, so only an item event can settle a pending sale.
         if (p.value.coinCopper > 0) this.accrueMoneyCopper(p.value.coinCopper);
+        if (!p.value.coinFromCorpse) {
+          if (this.pendingSale) this.pendingSale.soldCopper = p.value.coinCopper;
+          this.pendingSale = null;
+        }
         break;
       }
       case 'group':
@@ -521,6 +529,7 @@ export class SpawnStore {
   moneyTotal(): MoneyTotals { return { ...this.moneyTotals }; }
   clearLootLog(): void {
     this.lootLog = [];
+    this.pendingSale = null;
     this.moneyTotals = { platinum: 0, gold: 0, silver: 0, copper: 0 };
   }
   expLogEntries(): ReadonlyArray<ExpTick> { return this.expLog; }
@@ -530,23 +539,29 @@ export class SpawnStore {
     if (chatColor === CHAT_COLOR_LOOT) {
       const youMatch = LOOT_RX_YOU.exec(text);
       if (youMatch) {
-        this.pushLoot({ itemName: youMatch[1], looter: '', localTs: Date.now() });
+        this.pushLoot({
+          itemName: youMatch[1], looter: '', localTs: Date.now(),
+          qty: 1, disposition: null,
+        });
         return;
       }
       const otherMatch = LOOT_RX_OTHER.exec(text);
       if (otherMatch) {
-        this.pushLoot({ itemName: otherMatch[2], looter: otherMatch[1], localTs: Date.now() });
+        this.pushLoot({
+          itemName: otherMatch[2], looter: otherMatch[1], localTs: Date.now(),
+          qty: 1, disposition: null,
+        });
         return;
       }
-      const sellMatch = SELL_RX.exec(text);
-      if (sellMatch) {
-        // Item name only; the coin arrives separately as a LootTransaction.
-        this.pushLoot({ itemName: sellMatch[1], looter: '', localTs: Date.now() });
-        return;
-      }
-      const youAltMatch = LOOT_RX_YOU_ALT.exec(text);
-      if (youAltMatch) {
-        this.pushLoot({ itemName: youAltMatch[1], looter: '', localTs: Date.now() });
+      const eql = parseEqlLootMessage(text);
+      if (eql) {
+        const entry: LootEntry = {
+          itemName: eql.item, looter: '', localTs: Date.now(),
+          qty: eql.qty, disposition: eql.disposition,
+        };
+        this.pushLoot(entry);
+        // A sale's amount rides the LootTransaction that follows this line.
+        this.pendingSale = eql.sold ? entry : null;
         return;
       }
     }

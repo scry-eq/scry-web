@@ -41,7 +41,7 @@ export class LootRecorderCore {
       case 'snapshot':        this.flushPending(); this.setZone(p.value.zoneShort); break;
       case 'zoneChanged':     this.flushPending(); this.setZone(p.value.zoneShort); break;
       case 'chat':            this.onChat(p.value, this.tsOf(env)); break;
-      case 'lootTransaction': this.onLootTransaction(p.value); break;
+      case 'lootTransaction': this.onLootTransaction(p.value, this.tsOf(env)); break;
       case 'lootDrops':       this.onLootDrops(p.value, this.tsOf(env)); break;
     }
   }
@@ -82,8 +82,17 @@ export class LootRecorderCore {
   }
 
   // The confirmation for the pending message: overwrite with the authoritative
-  // wire values (item_id, corpse_id, quantity, sale coin) and emit.
-  private onLootTransaction(t: { corpseId: number; itemId: number; quantity: number; coinCopper: number }): void {
+  // wire values (item_id, corpse_id, quantity, sale coin) and emit. A corpse
+  // coin pile names no item, so it is its own row and must not consume the
+  // pending message — it arrives at loot-window open, before the item lines.
+  private onLootTransaction(
+    t: { corpseId: number; itemId: number; quantity: number; coinCopper: number; coinFromCorpse: boolean },
+    ts: number,
+  ): void {
+    if (t.coinFromCorpse) {
+      if (t.coinCopper > 0) this.writeCorpseCoin(t.coinCopper, ts);
+      return;
+    }
     const r = this.pending;
     if (!r) return;   // orphan transaction (no preceding message)
     if (t.itemId) r.itemId = t.itemId;
@@ -92,6 +101,16 @@ export class LootRecorderCore {
     r.moneyCopper = t.coinCopper;
     this.pending = null;
     this.write(r);
+  }
+
+  // Coin taken off a corpse. EQL auto-takes it, so receipt means acquired.
+  private writeCorpseCoin(copper: number, ts: number): void {
+    this.write(this.stamp({
+      ts, source: 'coin',
+      itemName: 'Coin', itemId: null, icon: null, qty: 1,
+      mobName: '', mobNorm: '', corpseId: null,
+      sold: 0, moneyCopper: copper, disposition: 'corpse_coin',
+    }));
   }
 
   // COMPLEMENTARY path: a loot window carries the full corpse contents (icon +
