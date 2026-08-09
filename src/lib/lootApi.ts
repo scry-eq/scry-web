@@ -1,77 +1,88 @@
-// Loot data access for the loot view. Browser path: fetch the recorder's HTTP
-// query API (loot-server.ts), derived from the daemon host. Tauri desktop path
-// (read loot.db directly via tauri-plugin-sql) is a follow-up gated on the
-// in-app recorder; isTauri() is here for when it lands.
-import { RECENT_LOOT_SQL, type LootRecord } from '@/recorder/queries';
-import type Database from '@tauri-apps/plugin-sql';
+// Loot history access. The host (showeq-daemon or scry) records what it decodes
+// and answers a LootQuery on its /loot websocket path, so there is no separate
+// recorder process to run, no second port to discover, and nothing to configure:
+// the loot socket is derived from whichever daemon URL the app is already on.
+import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
+import { EnvelopeSchema, type LootRecord } from '@gen/seq/v1/events_pb';
+import { ClientEnvelopeSchema, LootQuerySchema } from '@gen/seq/v1/client_pb';
 
 export type { LootRecord };
 
-const LOOT_API_OVERRIDE_KEY = 'showeq.lootApiUrl';
-const DEFAULT_LOOT_PORT = 9092;
+// How long to wait for the LootPage before giving up. The host answers from a
+// local SQLite read, so this only trips when it is unreachable or wedged.
+const QUERY_TIMEOUT_MS = 10_000;
 
-export function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-}
-
-// Same host as the daemon, on the loot API port — unless pinned in localStorage.
-export function lootApiBase(daemonWsUrl: string): string {
-  const override = typeof localStorage !== 'undefined' ? localStorage.getItem(LOOT_API_OVERRIDE_KEY) : null;
-  if (override) return override.replace(/\/+$/, '');
+// ws://host:port -> ws://host:port/loot, preserving wss:// on an https page.
+export function lootSocketUrl(daemonWsUrl: string): string {
   try {
     const u = new URL(daemonWsUrl);
-    const scheme = u.protocol === 'wss:' ? 'https' : 'http';
-    return `${scheme}://${u.hostname}:${DEFAULT_LOOT_PORT}`;
+    u.pathname = '/loot';
+    u.search = '';
+    u.hash = '';
+    return u.toString();
   } catch {
-    return `http://localhost:${DEFAULT_LOOT_PORT}`;
+    return 'ws://localhost:9090/loot';
   }
 }
 
-export async function fetchLoot(base: string, limit = 5000): Promise<LootRecord[]> {
-  if (isTauri()) return fetchLootTauri(limit);
-  const res = await fetch(`${base}/api/loot?limit=${limit}`);
-  if (!res.ok) throw new Error(`loot API responded ${res.status}`);
-  return (await res.json()) as LootRecord[];
+export async function fetchLoot(daemonWsUrl: string, limit = 5000): Promise<LootRecord[]> {
+  const url = lootSocketUrl(daemonWsUrl);
+  return new Promise((resolve, reject) => {
+    let ws: WebSocket;
+    try {
+      ws = new WebSocket(url);
+    } catch (e) {
+      reject(e instanceof Error ? e : new Error(String(e)));
+      return;
+    }
+    ws.binaryType = 'arraybuffer';
+
+    const done = (fn: () => void) => {
+      clearTimeout(timer);
+      try { ws.close(); } catch { /* already closing */ }
+      fn();
+    };
+    const timer = setTimeout(
+      () => done(() => reject(new Error(`no LootPage within ${QUERY_TIMEOUT_MS}ms`))),
+      QUERY_TIMEOUT_MS,
+    );
+
+    ws.onopen = () => {
+      const q = create(ClientEnvelopeSchema, {
+        payload: { case: 'lootQuery', value: create(LootQuerySchema, { limit }) },
+      });
+      ws.send(toBinary(ClientEnvelopeSchema, q));
+    };
+
+    ws.onmessage = (ev) => {
+      try {
+        const env = fromBinary(EnvelopeSchema, new Uint8Array(ev.data as ArrayBuffer));
+        if (env.payload.case !== 'lootPage') return;   // ignore anything else
+        const { rows } = env.payload.value;
+        done(() => resolve(rows));
+      } catch (e) {
+        done(() => reject(e instanceof Error ? e : new Error(String(e))));
+      }
+    };
+
+    // The browser withholds the reason for a failed socket, so name the URL —
+    // otherwise "loot unavailable" gives the user nothing to check.
+    ws.onerror = () => done(() => reject(new Error(`cannot reach ${url}`)));
+    ws.onclose = () => done(() => reject(new Error(`${url} closed before answering`)));
+  });
 }
 
-// The daemon's data namespace (from Snapshot.data_namespace), set by the Tauri
-// in-app recorder so the desktop loot view reads the SAME per-backend DB the
-// recorder writes (~/.showeq/loot.db for Live, ~/.showeq/eql/loot.db for EQL).
-let lootNamespace = '.showeq';
-export function setLootNamespace(ns: string): void {
-  lootNamespace = ns || '.showeq';
-}
-
-// Desktop build reads loot.db directly via tauri-plugin-sql (no HTTP host),
-// re-opening if the namespace (server) changed.
-let tauriDb: { ns: string; db: Promise<Database> } | null = null;
-async function fetchLootTauri(limit: number): Promise<LootRecord[]> {
-  if (!tauriDb || tauriDb.ns !== lootNamespace) {
-    const ns = lootNamespace;
-    const db = (async () => {
-      const { default: SqlDatabase } = await import('@tauri-apps/plugin-sql');
-      const { homeDir, join } = await import('@tauri-apps/api/path');
-      return SqlDatabase.load(`sqlite:${await join(await homeDir(), ns, 'loot.db')}`);
-    })();
-    tauriDb = { ns, db };
-  }
-  const db = await tauriDb.db;
-  return db.select<LootRecord[]>(RECENT_LOOT_SQL.replace('LIMIT ?', 'LIMIT $1'), [
-    Math.max(1, Math.floor(limit)),
-  ]);
-}
-
-const COIN: ReadonlyArray<readonly [string, number]> = [['p', 1000], ['g', 100], ['s', 10], ['c', 1]];
-
-// 20000 -> "20p", 4643 -> "4p 6g 4s 3c", 0 -> "".
+// copper -> "4p 6g 4s 3c", suppressing zero denominations.
 export function formatCoin(copper: number): string {
-  if (!copper) return '';
-  let rem = copper;
+  if (!copper) return '0c';
   const parts: string[] = [];
-  for (const [sym, val] of COIN) {
-    const n = Math.floor(rem / val);
-    if (n) parts.push(`${n}${sym}`);
-    rem -= n * val;
-  }
+  const p = Math.floor(copper / 1000);
+  const g = Math.floor(copper / 100) % 10;
+  const s = Math.floor(copper / 10) % 10;
+  const c = copper % 10;
+  if (p) parts.push(`${p.toLocaleString()}p`);
+  if (g) parts.push(`${g}g`);
+  if (s) parts.push(`${s}s`);
+  if (c) parts.push(`${c}c`);
   return parts.join(' ');
 }

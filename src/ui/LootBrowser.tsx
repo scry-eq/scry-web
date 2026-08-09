@@ -4,15 +4,15 @@ import {
   useReactTable, type SortingState,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { fetchLoot, formatCoin, lootApiBase, type LootRecord } from '@/lib/lootApi';
+import { fetchLoot, formatCoin, lootSocketUrl, type LootRecord } from '@/lib/lootApi';
 import { ItemIcon } from './ItemIcon';
 
 const ROW_HEIGHT = 24;
 const POLL_MS = 10_000;
 const FETCH_LIMIT = 5000;
 
-const fmtTime = (ts: number) => {
-  const d = new Date(ts);
+const fmtTime = (ts: bigint) => {
+  const d = new Date(Number(ts));
   const p = (n: number) => String(n).padStart(2, '0');
   return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
@@ -20,7 +20,7 @@ const fmtTime = (ts: number) => {
 const col = createColumnHelper<LootRecord>();
 const columns = [
   col.accessor('ts', { header: 'Time', size: 96, cell: (i) => fmtTime(i.getValue()) }),
-  col.accessor('item_name', {
+  col.accessor('itemName', {
     header: 'Item', size: 230,
     // `icon` is resolved upstream (window icon, or borrowed by item_id).
     cell: (i) => (
@@ -28,11 +28,11 @@ const columns = [
         {i.row.original.icon
           ? <ItemIcon icon={i.row.original.icon} size={18} />
           : <span className="w-[18px] shrink-0" />}
-        <span className="truncate">{i.row.original.item_name}</span>
+        <span className="truncate">{i.row.original.itemName}</span>
       </span>
     ),
   }),
-  col.accessor('item_id', {
+  col.accessor('itemId', {
     header: 'ID', size: 64,
     cell: (i) => <span className="text-muted-foreground">{i.getValue() ?? ''}</span>,
   }),
@@ -40,14 +40,14 @@ const columns = [
     header: 'Qty', size: 44,
     cell: (i) => <span className="tabular-nums">{i.getValue() > 1 ? i.getValue() : ''}</span>,
   }),
-  col.accessor('mob_name', { header: 'Mob', size: 160, cell: (i) => i.getValue() ?? '' }),
-  col.accessor('zone_base', {
+  col.accessor('mobName', { header: 'Mob', size: 160, cell: (i) => i.getValue() ?? '' }),
+  col.accessor('zoneBase', {
     header: 'Zone', size: 150,
     cell: (i) => {
       const r = i.row.original;
       return (
         <span>
-          {r.zone_base}
+          {r.zoneBase}
           {r.instance ? <span className="ml-1 text-muted-foreground">·{r.instance}</span> : null}
         </span>
       );
@@ -57,7 +57,7 @@ const columns = [
     header: 'Where', size: 108,
     cell: (i) => <span className="text-muted-foreground">{i.getValue() ?? ''}</span>,
   }),
-  col.accessor('money_copper', {
+  col.accessor('moneyCopper', {
     header: 'Coin', size: 92,
     cell: (i) => <span className="tabular-nums text-amber-500">{formatCoin(i.getValue())}</span>,
   }),
@@ -72,7 +72,8 @@ const columns = [
 type SourceFilter = 'all' | 'message' | 'window';
 
 export function LootBrowser({ daemonUrl }: { daemonUrl: string }) {
-  const base = useMemo(() => lootApiBase(daemonUrl), [daemonUrl]);
+  // The loot socket rides the daemon URL the app is already on.
+  const base = useMemo(() => lootSocketUrl(daemonUrl), [daemonUrl]);
   const [rows, setRows] = useState<LootRecord[]>([]);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -85,7 +86,7 @@ export function LootBrowser({ daemonUrl }: { daemonUrl: string }) {
     let alive = true;
     const load = async () => {
       try {
-        const data = await fetchLoot(base, FETCH_LIMIT);
+        const data = await fetchLoot(daemonUrl, FETCH_LIMIT);
         if (!alive) return;
         setRows(data);
         setError(null);
@@ -98,16 +99,16 @@ export function LootBrowser({ daemonUrl }: { daemonUrl: string }) {
     load();
     const t = setInterval(load, POLL_MS);
     return () => { alive = false; clearInterval(t); };
-  }, [base]);
+  }, [daemonUrl]);
 
   const zones = useMemo(
-    () => Array.from(new Set(rows.map((r) => r.zone_base).filter(Boolean))).sort() as string[],
+    () => Array.from(new Set(rows.map((r) => r.zoneBase).filter(Boolean))).sort() as string[],
     [rows],
   );
 
   const iconByItemId = useMemo(() => {
     const m = new Map<number, number>();
-    for (const r of rows) if (r.item_id != null && r.icon != null && !m.has(r.item_id)) m.set(r.item_id, r.icon);
+    for (const r of rows) if (r.itemId != null && r.icon != null && !m.has(r.itemId)) m.set(r.itemId, r.icon);
     return m;
   }, [rows]);
 
@@ -115,8 +116,8 @@ export function LootBrowser({ daemonUrl }: { daemonUrl: string }) {
     const q = search.trim().toLowerCase();
     return rows.filter((r) => {
       if (source !== 'all' && r.source !== source) return false;
-      if (zone && r.zone_base !== zone) return false;
-      if (q && !(r.item_name.toLowerCase().includes(q) || (r.mob_name ?? '').toLowerCase().includes(q)))
+      if (zone && r.zoneBase !== zone) return false;
+      if (q && !(r.itemName.toLowerCase().includes(q) || (r.mobName ?? '').toLowerCase().includes(q)))
         return false;
       return true;
     });
@@ -127,17 +128,18 @@ export function LootBrowser({ daemonUrl }: { daemonUrl: string }) {
     const mobs = new Set<string>();
     let coin = 0;
     for (const r of filtered) {
-      items.add(r.item_name);
-      if (r.mob_name) mobs.add(r.mob_norm ?? r.mob_name);
-      coin += r.money_copper;
+      items.add(r.itemName);
+      if (r.mobName) mobs.add(r.mobNorm ?? r.mobName);
+      coin += r.moneyCopper;
     }
     return { count: filtered.length, items: items.size, mobs: mobs.size, coin };
   }, [filtered]);
 
-  // Borrow an icon for message rows from a window row with the same item_id.
+  // Borrow an icon for message rows from a window row with the same item id.
+  // 0 is the wire's "absent" for both fields.
   const resolvedRows = useMemo(
     () => filtered.map((r) =>
-      r.icon != null || r.item_id == null ? r : { ...r, icon: iconByItemId.get(r.item_id) ?? null }),
+      r.icon !== 0 || r.itemId === 0 ? r : { ...r, icon: iconByItemId.get(r.itemId) ?? 0 }),
     [filtered, iconByItemId],
   );
 
@@ -146,7 +148,7 @@ export function LootBrowser({ daemonUrl }: { daemonUrl: string }) {
     columns,
     state: { sorting },
     onSortingChange: setSorting,
-    getRowId: (r) => String(r.id),
+    getRowId: (r, i) => `${r.ts}|${r.source}|${r.itemName}|${i}`,
     getCoreRowModel: getCoreRowModel(),
     getSortedRowModel: getSortedRowModel(),
   });
@@ -204,13 +206,13 @@ export function LootBrowser({ daemonUrl }: { daemonUrl: string }) {
       {/* body */}
       {error && rows.length === 0 ? (
         <div className="m-auto max-w-md text-center text-muted-foreground">
-          <p className="mb-2 text-foreground">Can't reach the loot recorder.</p>
-          <p>Tried <code className="text-foreground">{base}/api/loot</code> ({error}).</p>
-          <p className="mt-2">Start it on the daemon host with <code className="text-foreground">bun run record</code>.</p>
+          <p className="mb-2 text-foreground">Can't reach the loot history.</p>
+          <p>Tried <code className="text-foreground">{base}</code> ({error}).</p>
+          <p className="mt-2">The daemon records loot itself — check that it is running and up to date.</p>
         </div>
       ) : loaded && rows.length === 0 ? (
         <div className="m-auto max-w-md text-center text-muted-foreground">
-          No loot recorded yet. Loot something while <code className="text-foreground">bun run record</code> is running.
+          No loot recorded yet — loot something and it will show up here.
         </div>
       ) : (
         <div ref={scrollRef} className="flex-1 overflow-auto">

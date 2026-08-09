@@ -1,7 +1,7 @@
-// Shared DDL — created identically by the bun:sqlite sink (standalone host,
-// scripts/loot-recorder.ts) and, later, the tauri-plugin-sql sink (desktop
-// host). One denormalized loot table keeps the by-item / by-mob / by-zone
-// queries and stats trivial.
+// Shared DDL. The daemon and scry create this same table (see the daemon's
+// src/lootstore.cpp and scry's Scry.LootStore); this copy backs the offline
+// backfill sink. One denormalized loot table keeps the by-item / by-mob /
+// by-zone queries and stats trivial.
 export const SCHEMA = `
 CREATE TABLE IF NOT EXISTS loot (
   id           INTEGER PRIMARY KEY,

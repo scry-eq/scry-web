@@ -1,7 +1,8 @@
-// Host-agnostic loot recorder. Fed decoded Envelopes by either the standalone
-// Bun WebSocket host (scripts/loot-recorder.ts) or the Tauri in-app subscriber;
-// emits LootRows to an injected sink. No WebSocket / SQLite here on purpose so
-// the same logic runs in both hosts.
+// Host-agnostic loot recorder: fed decoded Envelopes, emits LootRows to an
+// injected sink. Live recording now happens in the daemon/scry (which share the
+// same logic via seq-backend-eql's LootTracker); what remains here is the
+// offline backfill path, scripts/loot-backfill.ts, which replays a .pbstream
+// into the same DB. No WebSocket / SQLite here on purpose.
 //
 // EQL fires a color-286 loot message immediately followed by a LootTransaction
 // (the next loot envelope) carrying the authoritative {corpse_id, item_id,

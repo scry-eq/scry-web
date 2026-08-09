@@ -1,5 +1,5 @@
 // bun:sqlite LootSink — the persistence backend for the standalone Bun host
-// (loot-recorder.ts) and the offline backfill script (loot-backfill.ts). Lives
+// (loot-backfill.ts). Lives
 // under scripts/ (not src/) because bun:sqlite isn't part of the tsc build.
 import { Database } from 'bun:sqlite';
 import { SCHEMA } from '../src/recorder/schema';
