@@ -1,8 +1,8 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
-  "productName": "showeq-web",
+  "productName": "scry-web",
   "version": "0.1.8",
-  "identifier": "com.showeq.web",
+  "identifier": "com.scryeq.web",
   "build": {
     "frontendDist": "../dist",
     "devUrl": "http://localhost:5173",

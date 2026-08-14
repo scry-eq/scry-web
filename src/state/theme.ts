@@ -14,8 +14,8 @@ export const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: 'shadui', label: 'ShadUI' },
 ];
 
-const KEY_MODE  = 'showeq.theme.mode';
-const KEY_THEME = 'showeq.theme.name';
+const KEY_MODE  = 'scry.theme.mode';
+const KEY_THEME = 'scry.theme.name';
 
 function isMode(v: unknown): v is Mode {
   return v === 'system' || v === 'light' || v === 'dark';

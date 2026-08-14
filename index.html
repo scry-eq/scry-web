@@ -5,17 +5,24 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <!-- Static title is replaced at runtime by src/title.ts with a randomly
          picked innocuous label, so a window-title scan from the EQ client
-         won't see "ShowEQ" or anything else identifying. -->
+         won't see the project name or anything else identifying. -->
     <title>Dashboard</title>
     <script>
       // Resolve saved theme + mode synchronously so the first paint
       // matches the user's choice (no flash). Mirrors src/state/theme.ts;
       // keep them in sync if the storage keys or values ever change.
+      // Runs before src/state/legacyKeys.ts, so it reads the pre-Scry
+      // `showeq.` keys itself rather than flashing on the first load
+      // after the rename.
       (function () {
         try {
-          var mode = localStorage.getItem('showeq.theme.mode');
+          var get = function (k) {
+            var v = localStorage.getItem('scry.' + k);
+            return v === null ? localStorage.getItem('showeq.' + k) : v;
+          };
+          var mode = get('theme.mode');
           if (mode !== 'light' && mode !== 'dark') mode = 'system';
-          var theme = localStorage.getItem('showeq.theme.name');
+          var theme = get('theme.name');
           if (theme !== 'shadui') theme = 'default';
           var resolved = mode;
           if (mode === 'system') {

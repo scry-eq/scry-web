@@ -1,4 +1,4 @@
-// Full race-id → name lookup. Ported from showeq-daemon/src/races.h.
+// Full race-id → name lookup. Ported from scry-cpp/src/races.h.
 // Null-named entries in the source are omitted; unknown IDs fall back to "Race N".
 const RACES: Record<number, string> = {
   0: 'Unknown', 1: 'Human', 2: 'Barbarian', 3: 'Erudite', 4: 'Wood Elf',

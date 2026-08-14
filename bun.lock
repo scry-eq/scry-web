@@ -3,7 +3,7 @@
   "configVersion": 1,
   "workspaces": {
     "": {
-      "name": "showeq-web",
+      "name": "scry-web",
       "dependencies": {
         "@bufbuild/protobuf": "^2.2.0",
         "@tanstack/react-table": "^8.21.3",

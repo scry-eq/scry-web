@@ -1,11 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { SpawnType } from '../gen/seq/v1/events_pb';
 
-// The store persists to showeq.spawnFilters and hydrates at module load, so
+// The store persists to scry.spawnFilters and hydrates at module load, so
 // we reset modules + clear storage per test to get a fresh default store.
 function clearStorage() {
   for (const k of [...Object.keys(localStorage)]) {
-    if (k.startsWith('showeq.')) localStorage.removeItem(k);
+    if (k.startsWith('scry.')) localStorage.removeItem(k);
   }
 }
 beforeEach(() => {

@@ -2,13 +2,13 @@ import { FloatingWindow } from './FloatingWindow';
 import type { SpawnStore } from '../state/store';
 
 // Indices into Item.stats[] / ItemCacheTotals.stats[]; mirrors
-// ItemStatIndex in showeq-daemon/src/itempacket.h.
+// ItemStatIndex in scry-cpp/src/itempacket.h.
 const STAT_LABELS = ['STR', 'STA', 'AGI', 'DEX', 'CHA', 'INT', 'WIS'] as const;
 // Indices into Item.resists[] / ItemCacheTotals.resists[]; mirrors
 // ItemResistIndex.
 const RESIST_LABELS = ['CR', 'DR', 'PR', 'MR', 'FR'] as const;
 // Worn-slot labels keyed by slot index. Mirrors the EQ slot enum (see
-// proto WornSet doc / showeq-daemon/src/itempacket.h). Entries 23-30
+// proto WornSet doc / scry-cpp/src/itempacket.h). Entries 23-30
 // (PersonalInv) and 35 (Cursor) aren't gear and don't appear in totals.
 const WORN_SLOT_LABELS: Record<number, string> = {
   0: 'Charm',

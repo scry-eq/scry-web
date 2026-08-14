@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 
-// Multibox view (Stage 4 of ../showeq-daemon/docs/MULTIBOX_PLAN.md).
+// Multibox view (Stage 4 of ../scry-cpp/docs/MULTIBOX_PLAN.md).
 // The daemon broadcasts BoxListUpdated whenever its registry of
 // observed EQ clients changes; this store mirrors that for the UI
 // picker. Not persisted — box identity is captured-session-scoped,

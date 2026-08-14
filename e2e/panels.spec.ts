@@ -142,7 +142,7 @@ test.describe('Snap-to-rail', () => {
     // Re-docked → floating window gone, Spawns visible inside right rail.
     await expect(fw).toBeHidden();
     const stored = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('showeq.layout') ?? '{}'),
+      JSON.parse(localStorage.getItem('scry.layout') ?? '{}'),
     );
     expect(stored.state.dockLocation.spawns).toBe('right');
   });
@@ -167,7 +167,7 @@ test.describe('Snap-to-rail', () => {
     await page.mouse.up();
 
     const stored = await page.evaluate(() =>
-      JSON.parse(localStorage.getItem('showeq.layout') ?? '{}'),
+      JSON.parse(localStorage.getItem('scry.layout') ?? '{}'),
     );
     // Player should NOT be at slot 0 anymore — was reordered to a
     // later slot.
@@ -184,10 +184,10 @@ test.describe('View menu', () => {
     // the same render path the menu toggles, without depending on
     // Radix menu interaction details that aren't part of this feature.
     await page.evaluate(() => {
-      const raw = localStorage.getItem('showeq.layout');
+      const raw = localStorage.getItem('scry.layout');
       const blob = raw ? JSON.parse(raw) : { state: {}, version: 1 };
       blob.state.panelsLocked = true;
-      localStorage.setItem('showeq.layout', JSON.stringify(blob));
+      localStorage.setItem('scry.layout', JSON.stringify(blob));
     });
     await page.reload();
     await expect(page.locator('section header button[aria-label^="Detach "]')).toHaveCount(0);

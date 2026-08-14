@@ -1,4 +1,4 @@
-// Mirrors showeq-daemon/src/filtermgr.h filter-type indices. The Spawn
+// Mirrors scry-cpp/src/filtermgr.h filter-type indices. The Spawn
 // proto's filter_flags field is a bitmask of (1 << index).
 //
 // Each filter has two color expressions:

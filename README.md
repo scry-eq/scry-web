@@ -1,7 +1,7 @@
-# showeq-web
+# scry-web
 
-React + TypeScript web client for the ShowEQ daemon. Connects to a running
-`showeq-daemon` over WebSocket, decodes `seq.v1` protobuf messages, and
+React + TypeScript web client for the Scry daemon. Connects to a running
+`scry-cpp` over WebSocket, decodes `seq.v1` protobuf messages, and
 renders spawns, zones, and player state in the browser.
 
 ## Stack
@@ -14,26 +14,26 @@ renders spawns, zones, and player state in the browser.
 ## Quick start
 
 `bun run gen` runs `buf generate proto`, where `proto/` is the
-[`showeq-proto`](https://github.com/showeq-unofficial/showeq-proto)
+[`scry-proto`](https://github.com/scry-eq/scry-proto)
 git submodule. Initialize it on first checkout:
 
 ```sh
-git clone --recurse-submodules https://github.com/showeq-unofficial/showeq-web.git
+git clone --recurse-submodules https://github.com/scry-eq/scry-web.git
 # or, if already cloned:
 git submodule update --init --recursive
 
-cd showeq-web
+cd scry-web
 bun install
 bun run gen           # generates src/gen/ from proto/
 bun run dev           # starts dev server on :5173
 ```
 
-Open http://localhost:5173 with a running `showeq-daemon` on
+Open http://localhost:5173 with a running `scry-cpp` on
 `ws://localhost:9090`.
 
 ## Connecting from an HTTPS-hosted page
 
-When you load showeq-web from `https://...` (e.g. the GitHub Pages
+When you load scry-web from `https://...` (e.g. the GitHub Pages
 build), browsers block insecure `ws://` connections as mixed content,
 and the daemon doesn't terminate TLS itself. Two ways around it:
 
@@ -56,7 +56,7 @@ and the daemon doesn't terminate TLS itself. Two ways around it:
 
 Tagged releases (`v*`) publish three desktop bundles via GitHub Actions: a
 Linux AppImage, a macOS `.dmg` (aarch64), and two Windows artifacts — an NSIS
-installer and a portable `.exe` (`showeq-web-vX.Y.Z-portable-x86_64.exe`)
+installer and a portable `.exe` (`scry-web-vX.Y.Z-portable-x86_64.exe`)
 cross-compiled from Linux via `cargo-xwin`.
 
 **Windows users:** Tauri renders the UI through Microsoft's WebView2 runtime.

@@ -2,5 +2,5 @@
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
 fn main() {
-  showeq_web_lib::run();
+  scry_web_lib::run();
 }

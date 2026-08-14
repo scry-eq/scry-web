@@ -7,7 +7,7 @@ import { SpawnType } from '../gen/seq/v1/events_pb';
 // MapCanvas passes the whole store object as the predicate state, so any
 // field added here is honored on the map automatically (no MapCanvas edit).
 //
-// Persisted (showeq.spawnFilters) so view filters AND named presets survive
+// Persisted (scry.spawnFilters) so view filters AND named presets survive
 // reloads. Named presets let players keep reusable setups ("named only",
 // "hunt list") and re-apply them in one click.
 //
@@ -163,7 +163,7 @@ export const useSpawnFilterStore = create<SpawnFilterState>()(
         set((s) => ({ presets: s.presets.filter((p) => p.name !== name) })),
     }),
     {
-      name: 'showeq.spawnFilters',
+      name: 'scry.spawnFilters',
       version: 1,
       storage: createJSONStorage(() => localStorage),
       // Persist the filter values + presets only; actions and the live

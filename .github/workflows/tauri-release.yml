@@ -53,7 +53,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
           tagName: ${{ github.ref_name }}
-          releaseName: 'showeq-web ${{ github.ref_name }}'
+          releaseName: 'scry-web ${{ github.ref_name }}'
           releaseDraft: false
           prerelease: true
           args: ${{ matrix.args }}
@@ -105,13 +105,13 @@ jobs:
 
       - name: Stage release asset
         run: |
-          cp src-tauri/target/x86_64-pc-windows-msvc/release/showeq-web.exe \
-             showeq-web-${{ github.ref_name }}-portable-x86_64.exe
+          cp src-tauri/target/x86_64-pc-windows-msvc/release/scry-web.exe \
+             scry-web-${{ github.ref_name }}-portable-x86_64.exe
 
       - name: Upload to prerelease
         uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ github.ref_name }}
-          name: 'showeq-web ${{ github.ref_name }}'
+          name: 'scry-web ${{ github.ref_name }}'
           prerelease: true
-          files: showeq-web-${{ github.ref_name }}-portable-x86_64.exe
+          files: scry-web-${{ github.ref_name }}-portable-x86_64.exe

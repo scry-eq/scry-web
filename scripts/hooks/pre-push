@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Pre-push: keep the proto submodule + generated TS in sync with canonical
-# showeq-proto, then typecheck.
+# scry-proto, then typecheck.
 # Bypass with: git push --no-verify
 set -euo pipefail
 REPO="$(git rev-parse --show-toplevel)"
@@ -24,7 +24,7 @@ if [[ -d proto ]]; then
             else
                 echo "" >&2
                 echo "ERROR: proto submodule ${SUB:0:12} is not on origin/proto main." >&2
-                echo "       Push showeq-proto FIRST (cross-repo order: proto -> daemon -> web)." >&2
+                echo "       Push scry-proto FIRST (cross-repo order: proto -> daemon -> web)." >&2
                 exit 1
             fi
         fi

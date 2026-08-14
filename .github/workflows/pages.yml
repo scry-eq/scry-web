@@ -19,11 +19,11 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: showeq-web
+        working-directory: scry-web
     steps:
       - uses: actions/checkout@v5
         with:
-          path: showeq-web
+          path: scry-web
           submodules: recursive
 
       - uses: oven-sh/setup-bun@v2
@@ -36,7 +36,7 @@ jobs:
 
       - uses: actions/upload-pages-artifact@v5
         with:
-          path: showeq-web/dist
+          path: scry-web/dist
 
   deploy:
     needs: build

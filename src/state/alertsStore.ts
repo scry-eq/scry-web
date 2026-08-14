@@ -151,7 +151,7 @@ export const useAlertsStore = create<AlertsState>()(
       }),
     }),
     {
-      name: 'showeq.alerts',
+      name: 'scry.alerts',
       version: 1,
       storage: jsonStorage,
       partialize: (state) => ({

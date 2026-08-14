@@ -1,9 +1,9 @@
 import { useEffect, useSyncExternalStore } from 'react';
 
 // Single source of truth for chat colours. Two key spaces:
-//   - "cc:<id>"  raw EQ ChatColor (CC_* in showeq-daemon/src/everquest.h),
+//   - "cc:<id>"  raw EQ ChatColor (CC_* in scry-cpp/src/everquest.h),
 //                used for OP_FormattedMessage / SimpleMessage / SpecialMessage.
-//   - "mt:<id>"  MessageType (MessageType in showeq-daemon/src/message.h),
+//   - "mt:<id>"  MessageType (MessageType in scry-cpp/src/message.h),
 //                used as a fallback for OP_ChannelMessage lines (chatColor=0).
 // Each entry has a single mid-saturation default hex that reads acceptably
 // against both light and dark surfaces. Users can override any entry from
@@ -168,7 +168,7 @@ export function isCombatChatColor(chatColor: number): boolean {
   return COMBAT_CHAT_COLOR_IDS.has(chatColor);
 }
 
-const STORAGE_KEY = 'showeq.chatColorOverrides';
+const STORAGE_KEY = 'scry.chatColorOverrides';
 
 function readOverrides(): Record<string, string> {
   try {

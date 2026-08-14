@@ -1,8 +1,8 @@
 // Backfill loot from an offline .pbstream capture (daemon FileSink format:
 // repeating 4-byte little-endian length + serialized seq.v1.Envelope). Feeds the
 // same recorder core as the live host, into the per-backend DB named by the
-// capture's own Snapshot.data_namespace (~/.showeq/loot.db for Live,
-// ~/.showeq/eql/loot.db for EQL) unless --db overrides. Also the fast,
+// capture's own Snapshot.data_namespace (~/.scry/loot.db for Live,
+// ~/.scry/eql/loot.db for EQL) unless --db overrides. Also the fast,
 // deterministic re-test path for the pipeline.
 //
 //   bun scripts/loot-backfill.ts <file.pbstream> [--db PATH]
@@ -41,7 +41,7 @@ function eachEnvelope(fn: (env: ReturnType<typeof fromBinary<typeof EnvelopeSche
 }
 
 // Pass 1: the DB namespace from the first Snapshot (stop there).
-let namespace = '.showeq';
+let namespace = '.scry';
 eachEnvelope((e) => {
   if (e.payload.case === 'snapshot') {
     if (e.payload.value.dataNamespace) namespace = e.payload.value.dataNamespace;

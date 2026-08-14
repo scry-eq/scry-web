@@ -1,4 +1,4 @@
-// Mirrors the player + NPC class lookup in showeq-daemon/src/classes.h.
+// Mirrors the player + NPC class lookup in scry-cpp/src/classes.h.
 // Player classes are ids 1..16, GM variants 20..35, NPC service classes
 // scattered above 40. Anything missing returns "" so callers render
 // blank rather than a stray number.

@@ -2,7 +2,7 @@ import { RefreshCw } from 'lucide-react';
 import { useBoxStore } from '../state/boxStore';
 
 // Header dropdown showing every EQ client the daemon has observed
-// (Stage 4 of ../showeq-daemon/docs/MULTIBOX_PLAN.md). Hidden when
+// (Stage 4 of ../scry-cpp/docs/MULTIBOX_PLAN.md). Hidden when
 // only zero or one boxes are present — no point cluttering the
 // header for the single-client case. Selection emits SetActiveBox;
 // the daemon broadcasts a fresh BoxListUpdated with the new

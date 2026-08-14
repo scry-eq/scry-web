@@ -1,4 +1,4 @@
-// Loot history access. The host (showeq-daemon or scry) records what it decodes
+// Loot history access. The host (scry-cpp or scry) records what it decodes
 // and answers a LootQuery on its /loot websocket path, so there is no separate
 // recorder process to run, no second port to discover, and nothing to configure:
 // the loot socket is derived from whichever daemon URL the app is already on.

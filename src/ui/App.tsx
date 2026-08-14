@@ -72,8 +72,8 @@ const STATUS_BADGE: Record<ConnStatus, string> = {
 // Daemon is expected to run on the user's own machine, not the page origin.
 const DEFAULT_WS_SCHEME = window.location.protocol === 'https:' ? 'wss' : 'ws';
 const DEFAULT_URL = `${DEFAULT_WS_SCHEME}://localhost:9090`;
-const URL_STORAGE_KEY = 'showeq.daemonUrl';
-const URL_HISTORY_KEY = 'showeq.daemonUrlHistory';
+const URL_STORAGE_KEY = 'scry.daemonUrl';
+const URL_HISTORY_KEY = 'scry.daemonUrlHistory';
 // Cap the history at a small N — this is a "did the daemon move?"
 // convenience picker, not a long-term log. The UI gets unwieldy past
 // a dozen entries anyway.
@@ -435,7 +435,7 @@ export function App() {
       }
     });
     // Multibox: daemon broadcasts BoxListUpdated as its BoxRegistry
-    // changes (Stage 4 of ../showeq-daemon/docs/MULTIBOX_PLAN.md).
+    // changes (Stage 4 of ../scry-cpp/docs/MULTIBOX_PLAN.md).
     // Mirror into useBoxStore so the header picker renders.
     const detachBoxes = client.onEnvelope((env) => {
       const p = env.payload;
@@ -544,7 +544,7 @@ export function App() {
       <Toaster theme="dark" richColors position="top-right" closeButton />
 
       <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-border bg-bg-panel px-3 py-2">
-        <h1 className="m-0 text-base font-semibold">ShowEQ</h1>
+        <h1 className="m-0 text-base font-semibold">Scry</h1>
         <input
           value={urlDraft}
           onChange={(e) => setUrlDraft(e.target.value)}
@@ -553,11 +553,11 @@ export function App() {
             if (e.key === 'Enter') { e.currentTarget.blur(); }
             else if (e.key === 'Escape') { setUrlDraft(url); e.currentTarget.blur(); }
           }}
-          list="showeq-daemon-url-history"
+          list="scry-cpp-url-history"
           spellCheck={false}
           className="w-80 rounded border border-border bg-bg-base px-2 py-1 font-mono text-xs text-foreground focus:border-ring focus:outline-none"
         />
-        <datalist id="showeq-daemon-url-history">
+        <datalist id="scry-cpp-url-history">
           {urlHistory.map((u) => <option key={u} value={u} />)}
         </datalist>
         <span className={`rounded px-2 py-0.5 text-xs ${STATUS_BADGE[status]}`}>

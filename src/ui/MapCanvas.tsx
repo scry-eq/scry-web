@@ -782,7 +782,7 @@ export function MapCanvas({
       const ccy = (minY + maxY) / 2;
       // Coords arrive in screen convention (+X right, +Y down) — the
       // daemon pre-negates EQ runtime coords at proto serialization time
-      // (see showeq-daemon/src/protoencoder.cpp fillPos / fillMapGeometry,
+      // (see scry-cpp/src/protoencoder.cpp fillPos / fillMapGeometry,
       // and the seq.v1 Pos message comment). Projection is identity on
       // the coords; pan adds an additional screen-pixel offset.
       // Apply a pending center request (from a SpawnList click). We need

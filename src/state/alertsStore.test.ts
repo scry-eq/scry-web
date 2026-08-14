@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-function clearAllShoweqStorage() {
+function clearAllScryStorage() {
   for (const k of [...Object.keys(localStorage)]) {
-    if (k.startsWith('showeq.')) localStorage.removeItem(k);
+    if (k.startsWith('scry.')) localStorage.removeItem(k);
   }
 }
 
 beforeEach(() => {
-  clearAllShoweqStorage();
+  clearAllScryStorage();
   vi.resetModules();
 });
 afterEach(() => {
-  clearAllShoweqStorage();
+  clearAllScryStorage();
 });
 
 async function loadStore() {
@@ -143,7 +143,7 @@ describe('alertsStore — notification channels', () => {
   it('backfills channel defaults when loading a pre-notification blob', async () => {
     // Existing install whose persisted state predates the toast/speech
     // fields — merge must fill them from defaults, not leave undefined.
-    localStorage.setItem('showeq.alerts', JSON.stringify({
+    localStorage.setItem('scry.alerts', JSON.stringify({
       state: { masterVolume: 0.3, buffWarningSecs: 60 },
       version: 1,
     }));

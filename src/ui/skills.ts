@@ -1,4 +1,4 @@
-// Skill id -> display name. Mirrors showeq-daemon/src/skills.h.
+// Skill id -> display name. Mirrors scry-cpp/src/skills.h.
 const SKILL_NAMES: Record<number, string> = {
   0:  '1H Blunt',
   1:  '1H Slashing',

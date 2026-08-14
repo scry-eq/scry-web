@@ -10,11 +10,11 @@ jobs:
     runs-on: ubuntu-latest
     defaults:
       run:
-        working-directory: showeq-web
+        working-directory: scry-web
     steps:
       - uses: actions/checkout@v5
         with:
-          path: showeq-web
+          path: scry-web
           submodules: recursive
 
       - uses: oven-sh/setup-bun@v2
@@ -38,14 +38,14 @@ jobs:
         uses: actions/upload-artifact@v6
         with:
           name: playwright-report
-          path: showeq-web/playwright-report
+          path: scry-web/playwright-report
           retention-days: 7
 
   # Populate the cargo-xwin MSVC CRT + Windows SDK cache scoped to main, so
   # tag-triggered Tauri Release builds can restore it (cache scoping doesn't
   # share between sibling tag refs, only with the default branch). Uses a
   # throwaway minimal crate to trigger the xwin SDK download without needing
-  # the showeq-web frontend — keeps the warm job small and self-contained.
+  # the scry-web frontend — keeps the warm job small and self-contained.
   warm-xwin-cache:
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-22.04

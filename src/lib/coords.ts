@@ -4,7 +4,7 @@
 // The daemon ships positions in SCREEN convention (+X = East/right,
 // +Y = South/down) — X and Y are negated from EQ's RUNTIME convention
 // (+X = West, +Y = North) at proto-serialization time (see
-// showeq-daemon/src/protoencoder.cpp fillPos). The map renders directly
+// scry-cpp/src/protoencoder.cpp fillPos). The map renders directly
 // in screen convention, so dot/line/grid geometry is correct as-is.
 //
 // EQ's in-game `/loc` command, however, prints (Y, X, Z) in runtime

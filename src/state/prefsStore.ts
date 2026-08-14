@@ -3,7 +3,7 @@ import { persist, type PersistStorage, type StorageValue } from 'zustand/middlew
 
 // User-tunable behavioral toggles. Distinct from layoutStore (panel
 // positioning) — these affect how packets drive selection and how the
-// map animates. Persisted to `showeq.prefs`; initial state reads the
+// map animates. Persisted to `scry.prefs`; initial state reads the
 // legacy per-toggle keys once so existing installs migrate cleanly.
 
 interface PrefsState {
@@ -54,12 +54,12 @@ const jsonStorage: PersistStorage<unknown> = {
 export const usePrefsStore = create<PrefsState>()(
   persist(
     (set) => ({
-      selectOnConsider:    readLegacyBool('showeq.selectOnConsider', false),
-      selectOnTarget:      readLegacyBool('showeq.selectOnTarget', false),
-      deselectOnUntarget:  readLegacyBool('showeq.deselectOnUntarget', false),
-      trackPlayer:         readLegacyBool('showeq.trackPlayer', false),
-      smoothMovement:      readLegacyBool('showeq.smoothMovement', true),
-      predictiveMovement:  readLegacyBool('showeq.predictiveMovement', false),
+      selectOnConsider:    readLegacyBool('scry.selectOnConsider', false),
+      selectOnTarget:      readLegacyBool('scry.selectOnTarget', false),
+      deselectOnUntarget:  readLegacyBool('scry.deselectOnUntarget', false),
+      trackPlayer:         readLegacyBool('scry.trackPlayer', false),
+      smoothMovement:      readLegacyBool('scry.smoothMovement', true),
+      predictiveMovement:  readLegacyBool('scry.predictiveMovement', false),
 
       setSelectOnConsider:    (v) => set({ selectOnConsider: v }),
       setSelectOnTarget:      (v) => set({ selectOnTarget: v }),
@@ -69,7 +69,7 @@ export const usePrefsStore = create<PrefsState>()(
       setPredictiveMovement:  (v) => set({ predictiveMovement: v }),
     }),
     {
-      name: 'showeq.prefs',
+      name: 'scry.prefs',
       version: 1,
       storage: jsonStorage,
       partialize: (state) => ({

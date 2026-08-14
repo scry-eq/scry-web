@@ -5,28 +5,28 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // — that's the only way to exercise the legacy-migration paths in
 // `loadInitial*`. For the action tests we still re-import once and
 // reset state between cases.
-const SHOWEQ_KEYS = [
-  'showeq.layout',
-  'showeq.panels',
-  'showeq.dockLocation',
-  'showeq.panelOrder',
-  'showeq.railWidths',
-  'showeq.leftSplit',
-  'showeq.panelsLocked',
+const SCRY_KEYS = [
+  'scry.layout',
+  'scry.panels',
+  'scry.dockLocation',
+  'scry.panelOrder',
+  'scry.railWidths',
+  'scry.leftSplit',
+  'scry.panelsLocked',
 ];
 
-function clearAllShoweqStorage() {
+function clearAllScryStorage() {
   for (const k of [...Object.keys(localStorage)]) {
-    if (k.startsWith('showeq.')) localStorage.removeItem(k);
+    if (k.startsWith('scry.')) localStorage.removeItem(k);
   }
 }
 
 beforeEach(() => {
-  clearAllShoweqStorage();
+  clearAllScryStorage();
   vi.resetModules();
 });
 afterEach(() => {
-  clearAllShoweqStorage();
+  clearAllScryStorage();
 });
 
 async function loadStore() {
@@ -47,23 +47,23 @@ describe('layoutStore — defaults', () => {
 });
 
 describe('layoutStore — legacy migration on first load', () => {
-  it('reads showeq.panels into visibility', async () => {
-    localStorage.setItem('showeq.panels', JSON.stringify({ buffs: true, combat: true }));
+  it('reads scry.panels into visibility', async () => {
+    localStorage.setItem('scry.panels', JSON.stringify({ buffs: true, combat: true }));
     const { useLayoutStore } = await loadStore();
     expect(useLayoutStore.getState().visibility.buffs).toBe(true);
     expect(useLayoutStore.getState().visibility.combat).toBe(true);
   });
 
-  it('reads showeq.dockLocation into dockLocation', async () => {
-    localStorage.setItem('showeq.dockLocation', JSON.stringify({ stats: 'floating' }));
+  it('reads scry.dockLocation into dockLocation', async () => {
+    localStorage.setItem('scry.dockLocation', JSON.stringify({ stats: 'floating' }));
     const { useLayoutStore } = await loadStore();
     expect(useLayoutStore.getState().dockLocation.stats).toBe('floating');
   });
 
-  it('reads showeq.panelOrder into panelOrder and backfills missing keys', async () => {
+  it('reads scry.panelOrder into panelOrder and backfills missing keys', async () => {
     // Saved order omits buffs and combat — they should land in their
     // default-rail tail per loadInitialPanelOrder's backfill logic.
-    localStorage.setItem('showeq.panelOrder', JSON.stringify({
+    localStorage.setItem('scry.panelOrder', JSON.stringify({
       left:  ['spawnPoints', 'spawns'],          // reversed
       right: ['chat', 'group', 'stats'],         // missing buffs + combat
     }));
@@ -76,25 +76,25 @@ describe('layoutStore — legacy migration on first load', () => {
     expect(order.right).toContain('combat');
   });
 
-  it('reads showeq.railWidths and clamps out-of-range values', async () => {
-    localStorage.setItem('showeq.railWidths', JSON.stringify({ left: 10, right: 9999 }));
+  it('reads scry.railWidths and clamps out-of-range values', async () => {
+    localStorage.setItem('scry.railWidths', JSON.stringify({ left: 10, right: 9999 }));
     const { useLayoutStore, RAIL_MIN, RAIL_MAX } = await loadStore();
     const rw = useLayoutStore.getState().railWidths;
     expect(rw.left).toBe(RAIL_MIN);
     expect(rw.right).toBe(RAIL_MAX);
   });
 
-  it('reads showeq.leftSplit and clamps it', async () => {
-    localStorage.setItem('showeq.leftSplit', '0.99');
+  it('reads scry.leftSplit and clamps it', async () => {
+    localStorage.setItem('scry.leftSplit', '0.99');
     const { useLayoutStore, LEFT_SPLIT_MAX } = await loadStore();
     expect(useLayoutStore.getState().leftSplit).toBe(LEFT_SPLIT_MAX);
   });
 
   it('falls back to defaults when legacy keys are malformed', async () => {
-    localStorage.setItem('showeq.panels', '{not valid json');
-    localStorage.setItem('showeq.dockLocation', '{also bad');
-    localStorage.setItem('showeq.panelOrder', '???');
-    localStorage.setItem('showeq.leftSplit', 'NaN');
+    localStorage.setItem('scry.panels', '{not valid json');
+    localStorage.setItem('scry.dockLocation', '{also bad');
+    localStorage.setItem('scry.panelOrder', '???');
+    localStorage.setItem('scry.leftSplit', 'NaN');
     const { useLayoutStore, DEFAULT_VISIBILITY, DEFAULT_DOCK_LOCATION, DEFAULT_PANEL_ORDER, DEFAULT_LEFT_SPLIT } = await loadStore();
     const s = useLayoutStore.getState();
     expect(s.visibility).toEqual(DEFAULT_VISIBILITY);
@@ -123,7 +123,7 @@ describe('layoutStore — actions', () => {
     const { useLayoutStore } = await loadStore();
     useLayoutStore.getState().setPanelsLocked(true);
     expect(useLayoutStore.getState().panelsLocked).toBe(true);
-    const persisted = JSON.parse(localStorage.getItem('showeq.layout') ?? '{}');
+    const persisted = JSON.parse(localStorage.getItem('scry.layout') ?? '{}');
     expect(persisted.state.panelsLocked).toBe(true);
   });
 
@@ -154,10 +154,10 @@ describe('layoutStore — actions', () => {
     Object.defineProperty(window, 'innerHeight', { configurable: true, value: 800 });
     useLayoutStore.getState().undock('spawns', { x: 100, y: 200, w: 300, h: 400 });
     expect(useLayoutStore.getState().dockLocation.spawns).toBe('floating');
-    expect(JSON.parse(localStorage.getItem('showeq.windowPos.panel.spawns')!))
+    expect(JSON.parse(localStorage.getItem('scry.windowPos.panel.spawns')!))
       // Anchor center (250, 400) - viewport center (500, 400) = (-250, 0)
       .toEqual({ x: -250, y: 0 });
-    expect(JSON.parse(localStorage.getItem('showeq.windowSize.panel.spawns')!))
+    expect(JSON.parse(localStorage.getItem('scry.windowSize.panel.spawns')!))
       .toEqual({ w: 300, h: 400 });
   });
 
@@ -165,8 +165,8 @@ describe('layoutStore — actions', () => {
     const { useLayoutStore } = await loadStore();
     useLayoutStore.getState().undock('spawns');
     expect(useLayoutStore.getState().dockLocation.spawns).toBe('floating');
-    expect(localStorage.getItem('showeq.windowPos.panel.spawns')).toBeNull();
-    expect(localStorage.getItem('showeq.windowSize.panel.spawns')).toBeNull();
+    expect(localStorage.getItem('scry.windowPos.panel.spawns')).toBeNull();
+    expect(localStorage.getItem('scry.windowSize.panel.spawns')).toBeNull();
   });
 });
 
@@ -233,10 +233,10 @@ describe('layoutStore — resetLayout', () => {
   it('restores defaults and wipes panel.* window keys, keeps utility window keys', async () => {
     const { useLayoutStore, DEFAULT_DOCK_LOCATION, DEFAULT_PANEL_ORDER } = await loadStore();
     // Pollute storage: a panel-level floating window AND a utility window.
-    localStorage.setItem('showeq.windowPos.panel.spawns', '{"x":10,"y":20}');
-    localStorage.setItem('showeq.windowSize.panel.spawns', '{"w":300,"h":400}');
-    localStorage.setItem('showeq.windowPos.loot', '{"x":50,"y":60}');
-    localStorage.setItem('showeq.windowSize.loot', '{"w":320,"h":380}');
+    localStorage.setItem('scry.windowPos.panel.spawns', '{"x":10,"y":20}');
+    localStorage.setItem('scry.windowSize.panel.spawns', '{"w":300,"h":400}');
+    localStorage.setItem('scry.windowPos.loot', '{"x":50,"y":60}');
+    localStorage.setItem('scry.windowSize.loot', '{"w":320,"h":380}');
     // Mutate state.
     useLayoutStore.getState().dockToSlot('spawns', 'right', 0);
     useLayoutStore.setState({ railWidths: { left: 500, right: 500 }, leftSplit: 0.7 });
@@ -249,10 +249,10 @@ describe('layoutStore — resetLayout', () => {
     expect(s.railWidths).toEqual({ left: 320, right: 320 });
     expect(s.leftSplit).toBe(0.55);
     // Panel-level keys gone, utility window keys preserved.
-    expect(localStorage.getItem('showeq.windowPos.panel.spawns')).toBeNull();
-    expect(localStorage.getItem('showeq.windowSize.panel.spawns')).toBeNull();
-    expect(localStorage.getItem('showeq.windowPos.loot')).not.toBeNull();
-    expect(localStorage.getItem('showeq.windowSize.loot')).not.toBeNull();
+    expect(localStorage.getItem('scry.windowPos.panel.spawns')).toBeNull();
+    expect(localStorage.getItem('scry.windowSize.panel.spawns')).toBeNull();
+    expect(localStorage.getItem('scry.windowPos.loot')).not.toBeNull();
+    expect(localStorage.getItem('scry.windowSize.loot')).not.toBeNull();
   });
 });
 
@@ -266,7 +266,7 @@ describe('layoutStore — railCollapsed', () => {
     const { useLayoutStore } = await loadStore();
     useLayoutStore.getState().toggleRailCollapsed('left');
     expect(useLayoutStore.getState().railCollapsed).toEqual({ left: true, right: false });
-    const persisted = JSON.parse(localStorage.getItem('showeq.layout') ?? '{}');
+    const persisted = JSON.parse(localStorage.getItem('scry.layout') ?? '{}');
     expect(persisted.state.railCollapsed.left).toBe(true);
   });
 
@@ -288,4 +288,4 @@ describe('layoutStore — railCollapsed', () => {
 
 // Reference exists so the import-graph stays alive even if we delete a
 // leaf test above — keeps tooling from yelling about an unused symbol.
-void SHOWEQ_KEYS;
+void SCRY_KEYS;

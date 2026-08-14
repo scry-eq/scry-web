@@ -2,7 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 // Headless chromium against the local vite dev server. The web client
 // runs daemon-agnostic — the UI renders panel chrome even when no
-// daemon is reachable, so these tests don't depend on showeq-daemon.
+// daemon is reachable, so these tests don't depend on scry-cpp.
 export default defineConfig({
   testDir: './e2e',
   fullyParallel: true,

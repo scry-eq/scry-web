@@ -8,7 +8,7 @@ import { dirname, resolve } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  base: process.env.GITHUB_ACTIONS && !process.env.TAURI_ENV_PLATFORM ? '/showeq-web/' : '/',
+  base: process.env.GITHUB_ACTIONS && !process.env.TAURI_ENV_PLATFORM ? '/scry-web/' : '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {

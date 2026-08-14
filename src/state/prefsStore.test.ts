@@ -1,17 +1,17 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-function clearAllShoweqStorage() {
+function clearAllScryStorage() {
   for (const k of [...Object.keys(localStorage)]) {
-    if (k.startsWith('showeq.')) localStorage.removeItem(k);
+    if (k.startsWith('scry.')) localStorage.removeItem(k);
   }
 }
 
 beforeEach(() => {
-  clearAllShoweqStorage();
+  clearAllScryStorage();
   vi.resetModules();
 });
 afterEach(() => {
-  clearAllShoweqStorage();
+  clearAllScryStorage();
 });
 
 async function loadStore() {
@@ -35,11 +35,11 @@ describe('prefsStore — defaults', () => {
 
 describe('prefsStore — legacy migration', () => {
   it('reads "1"/"0" string flags into booleans', async () => {
-    localStorage.setItem('showeq.selectOnConsider', '1');
-    localStorage.setItem('showeq.selectOnTarget', '0');
-    localStorage.setItem('showeq.deselectOnUntarget', '1');
-    localStorage.setItem('showeq.trackPlayer', '1');
-    localStorage.setItem('showeq.smoothMovement', '0');
+    localStorage.setItem('scry.selectOnConsider', '1');
+    localStorage.setItem('scry.selectOnTarget', '0');
+    localStorage.setItem('scry.deselectOnUntarget', '1');
+    localStorage.setItem('scry.trackPlayer', '1');
+    localStorage.setItem('scry.smoothMovement', '0');
     const { usePrefsStore } = await loadStore();
     const s = usePrefsStore.getState();
     expect(s.selectOnConsider).toBe(true);
@@ -52,7 +52,7 @@ describe('prefsStore — legacy migration', () => {
   it('treats absent legacy keys as their respective defaults', async () => {
     // Only one is set — the rest should fall through to defaults
     // (smoothMovement true, others false).
-    localStorage.setItem('showeq.selectOnTarget', '1');
+    localStorage.setItem('scry.selectOnTarget', '1');
     const { usePrefsStore } = await loadStore();
     const s = usePrefsStore.getState();
     expect(s.selectOnTarget).toBe(true);
@@ -80,18 +80,18 @@ describe('prefsStore — actions', () => {
     expect(after.predictiveMovement).toBe(true);
   });
 
-  it('persists state changes into showeq.prefs', async () => {
+  it('persists state changes into scry.prefs', async () => {
     const { usePrefsStore } = await loadStore();
     usePrefsStore.getState().setTrackPlayer(true);
-    const persisted = JSON.parse(localStorage.getItem('showeq.prefs') ?? '{}');
+    const persisted = JSON.parse(localStorage.getItem('scry.prefs') ?? '{}');
     expect(persisted.state.trackPlayer).toBe(true);
     // partialize should *not* persist actions
     expect(persisted.state.setTrackPlayer).toBeUndefined();
   });
 
-  it('rehydrates from showeq.prefs on next load', async () => {
+  it('rehydrates from scry.prefs on next load', async () => {
     // Write a "previous session" persisted blob, then reload module.
-    localStorage.setItem('showeq.prefs', JSON.stringify({
+    localStorage.setItem('scry.prefs', JSON.stringify({
       state: {
         selectOnConsider: true,
         selectOnTarget: false,

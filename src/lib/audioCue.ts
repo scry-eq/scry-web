@@ -14,7 +14,7 @@ import { useAlertsStore, type FilterCueKey } from '@/state/alertsStore';
 const COOLDOWN_MS = 600;
 
 // Vite serves /public at the site root; in CI builds the base path is
-// `/showeq-web/` (vite.config.ts), so use a leading slash + relative
+// `/scry-web/` (vite.config.ts), so use a leading slash + relative
 // path so import.meta.env.BASE_URL prepends correctly.
 function urlFor(name: string): string {
   return `${import.meta.env.BASE_URL}sounds/${name}.wav`;

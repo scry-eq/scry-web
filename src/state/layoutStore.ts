@@ -4,9 +4,9 @@ import { persist, type PersistStorage, type StorageValue } from 'zustand/middlew
 // Single source of truth for the panel-layout UI state. All of:
 //   visibility / dockLocation / panelOrder / panelsLocked / rail widths /
 //   left split
-// live here and persist through the `showeq.layout` key. Floating window
+// live here and persist through the `scry.layout` key. Floating window
 // pos+size for individual panels still live under their own
-// `showeq.windowPos.*` / `showeq.windowSize.*` keys (managed by
+// `scry.windowPos.*` / `scry.windowSize.*` keys (managed by
 // localPrefs + FloatingWindow) — that's per-window, not per-layout.
 
 export type PanelKey =
@@ -63,7 +63,7 @@ const isPanelKey = (v: unknown): v is PanelKey =>
 // One-time read of the legacy per-feature localStorage keys that
 // existed before this store. Used as initial state so an existing
 // install doesn't lose its layout the first time it picks up the
-// migration. Once the persist middleware writes `showeq.layout`,
+// migration. Once the persist middleware writes `scry.layout`,
 // rehydration takes over and these legacy reads become no-ops.
 function readLegacyJson<T>(key: string, validate: (v: unknown) => v is T): T | null {
   try {
@@ -77,19 +77,19 @@ function readLegacyJson<T>(key: string, validate: (v: unknown) => v is T): T | n
 }
 
 function loadInitialVisibility(): Record<PanelKey, boolean> {
-  const v = readLegacyJson<Partial<Record<PanelKey, boolean>>>('showeq.panels',
+  const v = readLegacyJson<Partial<Record<PanelKey, boolean>>>('scry.panels',
     (x): x is Partial<Record<PanelKey, boolean>> => typeof x === 'object' && x !== null);
   return { ...DEFAULT_VISIBILITY, ...(v ?? {}) };
 }
 
 function loadInitialDockLocation(): Record<PanelKey, DockLocation> {
-  const v = readLegacyJson<Partial<Record<PanelKey, DockLocation>>>('showeq.dockLocation',
+  const v = readLegacyJson<Partial<Record<PanelKey, DockLocation>>>('scry.dockLocation',
     (x): x is Partial<Record<PanelKey, DockLocation>> => typeof x === 'object' && x !== null);
   return { ...DEFAULT_DOCK_LOCATION, ...(v ?? {}) };
 }
 
 function loadInitialPanelOrder(): Record<RailSide, PanelKey[]> {
-  const v = readLegacyJson<Partial<Record<RailSide, unknown>>>('showeq.panelOrder',
+  const v = readLegacyJson<Partial<Record<RailSide, unknown>>>('scry.panelOrder',
     (x): x is Partial<Record<RailSide, unknown>> => typeof x === 'object' && x !== null);
   // No legacy data → use the documented default exactly. Don't fall
   // through to the backfill loop below, whose iteration order is the
@@ -111,7 +111,7 @@ function loadInitialPanelOrder(): Record<RailSide, PanelKey[]> {
 }
 
 function loadInitialRailWidths(): RailWidths {
-  const v = readLegacyJson<Partial<RailWidths>>('showeq.railWidths',
+  const v = readLegacyJson<Partial<RailWidths>>('scry.railWidths',
     (x): x is Partial<RailWidths> => typeof x === 'object' && x !== null);
   return {
     left:  clampRail(v?.left  ?? DEFAULT_LEFT_WIDTH),
@@ -121,7 +121,7 @@ function loadInitialRailWidths(): RailWidths {
 
 function loadInitialLeftSplit(): number {
   try {
-    const raw = localStorage.getItem('showeq.leftSplit');
+    const raw = localStorage.getItem('scry.leftSplit');
     if (raw == null) return DEFAULT_LEFT_SPLIT;
     const parsed = Number(raw);
     return Number.isFinite(parsed) ? clampSplit(parsed) : DEFAULT_LEFT_SPLIT;
@@ -131,14 +131,14 @@ function loadInitialLeftSplit(): number {
 }
 
 function loadInitialPanelsLocked(): boolean {
-  return localStorage.getItem('showeq.panelsLocked') === '1';
+  return localStorage.getItem('scry.panelsLocked') === '1';
 }
 
 function loadInitialStatusBarVisible(): boolean {
   // Default to visible — the bar carries info (zone server + EQ time)
   // that's hard to surface elsewhere. Hide-by-default would render the
   // first-launch experience strictly worse.
-  const raw = localStorage.getItem('showeq.statusBar');
+  const raw = localStorage.getItem('scry.statusBar');
   return raw == null ? true : raw === '1';
 }
 
@@ -235,8 +235,8 @@ export const useLayoutStore = create<LayoutState>()(
           const cy = anchor.y + anchor.h / 2;
           const offset = { x: cx - window.innerWidth / 2, y: cy - window.innerHeight / 2 };
           try {
-            localStorage.setItem(`showeq.windowPos.${id}`, JSON.stringify(offset));
-            localStorage.setItem(`showeq.windowSize.${id}`, JSON.stringify({ w: anchor.w, h: anchor.h }));
+            localStorage.setItem(`scry.windowPos.${id}`, JSON.stringify(offset));
+            localStorage.setItem(`scry.windowSize.${id}`, JSON.stringify({ w: anchor.w, h: anchor.h }));
           } catch { /* storage full — fall back to default centered */ }
         }
         set((s) => ({ dockLocation: { ...s.dockLocation, [k]: 'floating' } }));
@@ -262,7 +262,7 @@ export const useLayoutStore = create<LayoutState>()(
 
       resetLayout: () => {
         for (const k of Object.keys(localStorage)) {
-          if (k.startsWith('showeq.windowPos.panel.') || k.startsWith('showeq.windowSize.panel.')) {
+          if (k.startsWith('scry.windowPos.panel.') || k.startsWith('scry.windowSize.panel.')) {
             localStorage.removeItem(k);
           }
         }
@@ -279,7 +279,7 @@ export const useLayoutStore = create<LayoutState>()(
       },
     }),
     {
-      name: 'showeq.layout',
+      name: 'scry.layout',
       version: 1,
       storage: jsonStorage,
       // Persist data fields only — actions stay on the store but don't

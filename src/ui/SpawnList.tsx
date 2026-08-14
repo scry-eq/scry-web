@@ -97,7 +97,7 @@ const columns = [
   columnHelper.accessor('klass', {
     header: 'Class',
     size: 80,
-    // Full class name from showeq-daemon/src/classes.h — covers the 16
+    // Full class name from scry-cpp/src/classes.h — covers the 16
     // player classes, GM variants, and NPC service roles (Shopkeeper,
     // Banker, etc.). Untyped NPCs (id 0) render blank. EQL multiclass mobs
     // show "SHD/DRU/MNK" (from classMask) instead of just the primary.

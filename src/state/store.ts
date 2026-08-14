@@ -116,7 +116,7 @@ const SKILL_LOG_LIMIT = 200;
 const LOOT_LOG_LIMIT = 1000;
 const LOOT_DROPS_LIMIT = 500;
 const EXP_LOG_LIMIT = 1000;
-// CC_User_Loot from showeq-daemon-quarm/src/everquest.h. Loot lines from
+// CC_User_Loot from scry-cpp-quarm/src/everquest.h. Loot lines from
 // the server arrive as OP_FormattedMessage with this colour.
 const CHAT_COLOR_LOOT = 286;
 // EQMacEmu string templates 466/467 — both wrapped with literal "--"

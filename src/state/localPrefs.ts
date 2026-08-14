@@ -1,5 +1,5 @@
 // Per-floating-window position and size, stored under
-// `showeq.windowPos.{id}` / `showeq.windowSize.{id}` keys. Used by
+// `scry.windowPos.{id}` / `scry.windowSize.{id}` keys. Used by
 // `FloatingWindow` directly — kept out of the zustand stores because
 // the IDs are dynamic (one entry per FloatingWindow id) and the data
 // is component-internal. UI behavioral toggles live in `prefsStore`,
@@ -47,11 +47,11 @@ function writeSize(key: string, size: WindowSize): void {
 export const localPrefs = {
   // Floating-window positions are offsets from the window's CSS-centered
   // initial position (the {0,0} default keeps it centered on first open).
-  windowPos: (id: string): WindowPos => readPos(`showeq.windowPos.${id}`),
+  windowPos: (id: string): WindowPos => readPos(`scry.windowPos.${id}`),
   setWindowPos: (id: string, pos: WindowPos) =>
-    writePos(`showeq.windowPos.${id}`, pos),
+    writePos(`scry.windowPos.${id}`, pos),
   windowSize: (id: string): WindowSize | null =>
-    readSize(`showeq.windowSize.${id}`),
+    readSize(`scry.windowSize.${id}`),
   setWindowSize: (id: string, size: WindowSize) =>
-    writeSize(`showeq.windowSize.${id}`, size),
+    writeSize(`scry.windowSize.${id}`, size),
 };

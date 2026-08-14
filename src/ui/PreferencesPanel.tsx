@@ -31,7 +31,7 @@ const MODE_ICONS: { value: Mode; label: string; Icon: typeof Sun }[] = [
 // converges even if multiple clients are editing.
 //
 // New keys land here as they're added to the daemon allowlist
-// (showeq-daemon/src/prefsbroker.cpp).
+// (scry-cpp/src/prefsbroker.cpp).
 export function PreferencesPanel({
   store,
   client,
