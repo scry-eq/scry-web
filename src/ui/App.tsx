@@ -18,7 +18,9 @@ import {
 } from '@/components/ui/tabs';
 import { ChatColorsPanel } from './ChatColorsPanel';
 import { SeqClient } from '../net/client';
+import { DEFAULT_URL, URL_STORAGE_KEY } from '../net/daemonUrl';
 import { SpawnStore } from '../state/store';
+import { OverlayToggle } from './OverlayToggle';
 import { BoxPicker } from './BoxPicker';
 import { BuffsPanel } from './BuffsPanel';
 import { TargetEffectsPanel } from './TargetEffectsPanel';
@@ -68,11 +70,6 @@ const STATUS_BADGE: Record<ConnStatus, string> = {
   disconnected: 'bg-red-800 text-red-100',
 };
 
-// Match the page's scheme so an https-hosted UI doesn't trip mixed-content.
-// Daemon is expected to run on the user's own machine, not the page origin.
-const DEFAULT_WS_SCHEME = window.location.protocol === 'https:' ? 'wss' : 'ws';
-const DEFAULT_URL = `${DEFAULT_WS_SCHEME}://localhost:9090`;
-const URL_STORAGE_KEY = 'scry.daemonUrl';
 const URL_HISTORY_KEY = 'scry.daemonUrlHistory';
 // Cap the history at a small N — this is a "did the daemon move?"
 // convenience picker, not a long-term log. The UI gets unwieldy past
@@ -567,6 +564,7 @@ export function App() {
           onChange={(boxId) => clientRef.current?.setActiveBox(boxId)}
         />
         <div className="ml-auto flex items-center gap-2">
+          <OverlayToggle />
           <div className="flex h-6 overflow-hidden rounded border border-border">
             {(['map', 'loot'] as const).map((m) => (
               <button

@@ -21,6 +21,10 @@ floating-window/docking system, and the coordinate/con-color conventions.
   `localPrefs.ts`
 - `src/ui/` — components, incl. `FloatingWindow.tsx`, `SnapZones.tsx`,
   `concolor.ts`, `classes.ts`
+- `src/overlay/` — the transparent always-on-top overlay window's page
+  (`overlay.html` is a second Vite entry; see `docs/overlay.md`)
+- `src-tauri/` — the Tauri desktop shell: window policy, overlay window,
+  per-window capabilities
 - `src/**/*.test.ts` — vitest unit tests (happy-dom env)
 - `e2e/**/*.spec.ts` — playwright e2e tests
 - `scripts/` — `diag-movement.ts`, `watch-smoother.ts` (live-state
@@ -36,6 +40,8 @@ floating-window/docking system, and the coordinate/con-color conventions.
 - `bun run test:e2e` — playwright e2e tests (against the local vite dev
   server, auto-started)
 - `bun run smoke`
+- `bun run tauri:dev` / `bun run tauri:build` — the desktop shell. Both
+  drive Vite on :5173, so they collide with a `bun run dev` already up.
 
 ## Conventions
 
@@ -74,3 +80,6 @@ floating-window/docking system, and the coordinate/con-color conventions.
   three zustand stores + `localPrefs`), the FloatingWindow/panel-docking
   system, the coordinate convention, con-color/chat-color source of truth,
   map rendering rules, and live-state debugging recipes.
+- [`docs/overlay.md`](docs/overlay.md) — the transparent always-on-top
+  overlay window: why its hover sensor polls, the per-platform shims, and
+  what Tauri cannot express.

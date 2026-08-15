@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "scry-web",
-  "version": "0.1.8",
+  "version": "0.1.10",
   "identifier": "com.scryeq.web",
   "build": {
     "frontendDist": "../dist",
@@ -21,7 +21,8 @@
     ],
     "security": {
       "csp": "default-src 'self' tauri: asset: https://asset.localhost; connect-src 'self' ws: wss:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
-    }
+    },
+    "macOSPrivateApi": true
   },
   "bundle": {
     "active": true,
