@@ -1,6 +1,8 @@
 [package]
 name = "scry-web"
-version = "0.1.2"
+# Names the binary (scry-web.exe). Keep in step with tauri.conf.json
+# `version`, which is what the bundles are actually stamped with.
+version = "0.1.10"
 description = "Scry web client (Tauri shell)"
 authors = []
 license = "GPL-2.0"
