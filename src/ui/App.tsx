@@ -18,7 +18,7 @@ import {
 } from '@/components/ui/tabs';
 import { ChatColorsPanel } from './ChatColorsPanel';
 import { SeqClient } from '../net/client';
-import { DEFAULT_URL, URL_STORAGE_KEY } from '../net/daemonUrl';
+import { DEFAULT_URL, URL_STORAGE_KEY, daemonUrlOverride } from '../net/daemonUrl';
 import { SpawnStore } from '../state/store';
 import { OverlayToggle } from './OverlayToggle';
 import { BoxPicker } from './BoxPicker';
@@ -385,6 +385,18 @@ export function App() {
     setSelectedId(id);
     setSelectVersion((v) => v + 1);
   };
+
+  // An address supplied by the shell replaces the stored one before anything connects.
+  useEffect(() => {
+    void daemonUrlOverride().then((v) => {
+      if (!v || v === url) return;
+      localStorage.setItem(URL_STORAGE_KEY, v);
+      setUrl(v);
+      setUrlDraft(v);
+    });
+    // Once, at startup: this is a launch argument, not a live setting.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const commitUrl = () => {
     const trimmed = urlDraft.trim();

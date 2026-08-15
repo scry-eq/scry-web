@@ -30,6 +30,30 @@ const TITLES: &[&str] = &[
   "New Tab",
 ];
 
+/// The daemon address, when the UI is not a usable way to set it. `SCRY_DAEMON_URL=...`
+/// or `--url ws://host:9090`.
+///
+/// The default is localhost, which is wrong for every setup where the client and the daemon
+/// are on different machines — and a client pointed at an address that can never answer is
+/// exactly when the address field is hardest to use. This is the way in that does not depend
+/// on the UI behaving.
+#[tauri::command]
+fn daemon_url_override() -> Option<String> {
+  if let Some(v) = std::env::var_os("SCRY_DAEMON_URL") {
+    return v.into_string().ok().filter(|s| !s.is_empty());
+  }
+  let mut args = std::env::args().skip(1);
+  while let Some(a) = args.next() {
+    if a == "--url" {
+      return args.next().filter(|s| !s.is_empty());
+    }
+    if let Some(v) = a.strip_prefix("--url=") {
+      return Some(v.to_string()).filter(|s| !s.is_empty());
+    }
+  }
+  None
+}
+
 /// Where the log goes. The OS log dir is the right home for it, but it is also a place a
 /// user has to be told how to find — so the exe's own directory gets a copy. When someone is
 /// running a build straight out of a shared build tree, that is the one file both ends can
@@ -71,6 +95,7 @@ pub fn run() {
       overlay::overlay_close,
       overlay::overlay_locked,
       overlay::overlay_status,
+      daemon_url_override,
       overlay::overlay_set_locked,
       overlay::overlay_set_hot_zones,
     ])
@@ -92,6 +117,7 @@ pub fn run() {
         env!("CARGO_PKG_VERSION"),
         env!("SCRY_BUILD_ID")
       );
+      log::info!("daemon url override: {:?}", daemon_url_override());
       // Cover any window the user/config defines, not just "main", in case
       // the label is renamed or extra windows get added later.
       for (_, w) in app.webview_windows() {

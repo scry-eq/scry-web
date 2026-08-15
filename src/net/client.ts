@@ -38,6 +38,7 @@ export class SeqClient {
   private ws?: WebSocket;
   private listeners = new Set<EnvelopeListener>();
   private backoffMs = 250;
+  private retry?: ReturnType<typeof setTimeout>;
   private closed = false;
   private sessionId = '';
   private lastSeq = 0n;
@@ -63,6 +64,7 @@ export class SeqClient {
 
     ws.onopen = () => {
       this.backoffMs = 250;
+      if (this.retry !== undefined) { clearTimeout(this.retry); this.retry = undefined; }
       const env = create(ClientEnvelopeSchema, {
         payload: {
           case: 'subscribe',
@@ -100,6 +102,7 @@ export class SeqClient {
 
   close(): void {
     this.closed = true;
+    if (this.retry !== undefined) { clearTimeout(this.retry); this.retry = undefined; }
     this.ws?.close();
   }
 
@@ -308,10 +311,22 @@ export class SeqClient {
     this.ws.send(toBinary(ClientEnvelopeSchema, env));
   }
 
+  // ONE pending retry, ever. A failing connection can deliver both `error` and `close`,
+  // and the `error` handler closes the socket itself — so without this guard a single
+  // failed attempt could arm two timers, and two become four. The browser decides how many
+  // of those events it sends and in what order, which is why this must not depend on it.
+  //
+  // The cap is high and jittered on purpose: a URL that can NEVER work (daemon on another
+  // machine, wrong port) must degrade to an occasional retry, not a permanent
+  // connect/disconnect cycle that makes the app unusable while the user tries to correct
+  // the address.
   private scheduleReconnect(): void {
-    if (this.closed) return;
-    const delay = this.backoffMs;
-    this.backoffMs = Math.min(this.backoffMs * 2, 5_000);
-    setTimeout(() => this.connect(), delay);
+    if (this.closed || this.retry !== undefined) return;
+    const delay = this.backoffMs + Math.random() * 250;
+    this.backoffMs = Math.min(this.backoffMs * 2, 30_000);
+    this.retry = setTimeout(() => {
+      this.retry = undefined;
+      this.connect();
+    }, delay);
   }
 }
