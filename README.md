@@ -1,8 +1,10 @@
 # scry-web
 
-React + TypeScript web client for the Scry daemon. Connects to a running
-`scry-cpp` over WebSocket, decodes `seq.v1` protobuf messages, and
-renders spawns, zones, and player state in the browser.
+React + TypeScript web client for Scry. Connects to a running daemon
+(`scry-cpp` for Live EQ, `scry-cpp-quarm` for Project Quarm — the client is
+daemon-agnostic and never branches on which one it's talking to) over
+WebSocket, decodes `seq.v1` protobuf messages, and renders spawns, zones,
+and player state in the browser.
 
 ## Stack
 
@@ -104,30 +106,29 @@ src/
   gen/                        # generated protobuf (git-ignored)
   net/
     client.ts                 # WebSocket + subscribe/receive loop, resume
+  lib/                        # EQ data tables + small utilities: chatColors.ts,
+                               #   coords.ts (screen<->runtime coordinate convention),
+                               #   equipModels.ts, races.ts, audioCue.ts, speech.ts, ...
+  recorder/                   # loot-history recording (core.ts, loot.ts, schema.ts)
   state/
-    store.ts                  # in-memory spawn/zone/chat/combat/buffs/group/prefs
-    localPrefs.ts             # browser-only UI prefs (panel layout, etc.)
+    store.ts                  # in-memory spawn/zone/chat/combat/buffs/group state
+    layoutStore.ts            # panel docking (visibility, dockLocation, panelOrder, rails)
+    prefsStore.ts             # user behavior toggles (selectOnConsider, smoothMovement, ...)
+    spawnFilterStore.ts       # filter state shared by SpawnList + MapCanvas
+    alertsStore.ts, boxStore.ts, localPrefs.ts, legacyKeys.ts, theme.ts
   ui/
     App.tsx                   # root layout, rails, panel orchestration
     MapCanvas.tsx             # canvas-based spawn map (geometry, FOV, hits)
     SpawnList.tsx             # tanstack-table spawn grid + tinting
-    SpawnPointList.tsx        # SpawnMonitor's promoted points
-    StatsPanel.tsx            # HP/mana/stamina/exp bars
-    GroupPanel.tsx            # 6-slot group readout
-    BuffsPanel.tsx            # active buff list + tickdown
-    ChatLog.tsx               # scrolling chat lines by channel
-    CombatLog.tsx             # scrolling combat events
-    FilterRulesPanel.tsx      # FilterMgr rule editor (add/remove)
-    PreferencesPanel.tsx      # daemon-side prefs editor (allowlisted)
-    CategorySelect.tsx        # CategoryMgr filter dropdown
-    SettingsContent.tsx,      # daemon URL, panel toggles, theme
-    SettingsModal.tsx
-    Panel.tsx,                # generic collapsible/resizable panel chrome
-    ResizeHandle.tsx,
-    VerticalResizeHandle.tsx
-    classes.ts                # EQ class id → name + color
-    concolor.ts               # con-color level math
-    filterflags.ts            # FilterMgr bitmask helpers + row tints
+    FloatingWindow.tsx        # detachable/dockable panel chrome (drag, resize, persistence)
+    SnapZones.tsx             # rail snap-to-dock overlay during a drag
+    Panel.tsx, RailDivider.tsx,   # generic panel/rail chrome
+    ResizeHandle.tsx, VerticalResizeHandle.tsx
+    *Panel.tsx / *Window.tsx      # ~30 docked panels + floating windows: stats, group,
+                                   #   buffs, chat, combat, guild, AA, skills, loot,
+                                   #   inventory stats, alerts, target, spawn points, ...
+    classes.ts, concolor.ts,      # EQ presentation helpers: class id -> name/color,
+    filterflags.ts, skills.ts     #   con-color math, FilterMgr bitmask + row tints, skill caps
 ```
 
 ## License
