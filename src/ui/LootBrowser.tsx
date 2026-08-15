@@ -1,7 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  createColumnHelper, flexRender, getCoreRowModel, getSortedRowModel,
-  useReactTable, type SortingState,
+  columnSizingFeature,
+  createColumnHelper,
+  createSortedRowModel,
+  flexRender,
+  rowSortingFeature,
+  tableFeatures,
+  useTable,
+  type SortingState,
 } from '@tanstack/react-table';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { fetchLoot, formatCoin, lootSocketUrl, type LootRecord } from '@/lib/lootApi';
@@ -17,8 +23,15 @@ const fmtTime = (ts: bigint) => {
   return `${p(d.getMonth() + 1)}-${p(d.getDate())} ${p(d.getHours())}:${p(d.getMinutes())}`;
 };
 
-const col = createColumnHelper<LootRecord>();
-const columns = [
+// Sorting and fixed column widths; this table has no resize handles.
+const features = tableFeatures({
+  rowSortingFeature,
+  columnSizingFeature,
+  sortedRowModel: createSortedRowModel(),
+});
+
+const col = createColumnHelper<typeof features, LootRecord>();
+const columns = col.columns([
   col.accessor('ts', { header: 'Time', size: 96, cell: (i) => fmtTime(i.getValue()) }),
   col.accessor('itemName', {
     header: 'Item', size: 230,
@@ -67,7 +80,7 @@ const columns = [
       <span className="text-muted-foreground">{i.getValue() === 'message' ? 'got' : 'corpse'}</span>
     ),
   }),
-];
+]);
 
 type SourceFilter = 'all' | 'message' | 'window';
 
@@ -143,14 +156,13 @@ export function LootBrowser({ daemonUrl }: { daemonUrl: string }) {
     [filtered, iconByItemId],
   );
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: resolvedRows,
     columns,
     state: { sorting },
     onSortingChange: setSorting,
     getRowId: (r, i) => `${r.ts}|${r.source}|${r.itemName}|${i}`,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
   });
   const sorted = table.getRowModel().rows;
 
@@ -244,7 +256,7 @@ export function LootBrowser({ daemonUrl }: { daemonUrl: string }) {
                     style={{ height: ROW_HEIGHT }}
                     className="border-b border-border/40 odd:bg-bg-alt/30 hover:bg-bg-alt"
                   >
-                    {row.getVisibleCells().map((cell) => (
+                    {row.getAllCells().map((cell) => (
                       <td key={cell.id} className="truncate px-2" style={{ width: cell.column.getSize() }}>
                         {flexRender(cell.column.columnDef.cell, cell.getContext())}
                       </td>

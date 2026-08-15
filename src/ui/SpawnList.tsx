@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  columnResizingFeature,
+  columnSizingFeature,
   createColumnHelper,
+  createSortedRowModel,
   flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  useReactTable,
+  rowSortingFeature,
+  tableFeatures,
+  useTable,
   type ColumnSizingState,
   type SortingState,
 } from '@tanstack/react-table';
@@ -21,12 +24,19 @@ import { equipSummary, equipSlotDisplay } from '../lib/equipModels';
 // Lets row/cell renderers know the current selection (which tracks the
 // in-game target when selectOnTarget is on) so a locked mob you're engaged
 // with isn't shown as unattackable — you can attack your own target.
-declare module '@tanstack/react-table' {
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  interface TableMeta<TData> {
-    selectedId: number | null;
-  }
-}
+type SpawnTableMeta = { selectedId: number | null };
+
+// v9 composes table behaviour from explicit features; only what we name here
+// is bundled. Sorting, plus resizable column widths.
+const features = tableFeatures({
+  rowSortingFeature,
+  columnSizingFeature,
+  columnResizingFeature,
+  sortedRowModel: createSortedRowModel(),
+  // Type-only slot: scopes `options.meta` to this table instead of augmenting
+  // the library's global TableMeta interface.
+  tableMeta: {} as SpawnTableMeta,
+});
 
 type Row = {
   id: number;
@@ -48,9 +58,9 @@ type Row = {
   equipModels: number[];
 };
 
-const columnHelper = createColumnHelper<Row>();
+const columnHelper = createColumnHelper<typeof features, Row>();
 
-const columns = [
+const columns = columnHelper.columns([
   columnHelper.accessor('conColor', {
     id: 'con',
     header: '',
@@ -126,7 +136,7 @@ const columns = [
       return Number.isFinite(v) ? v.toFixed(0) : '–';
     },
   }),
-];
+]);
 
 function distanceSq(a: Spawn, b: Spawn | undefined): number {
   if (!b?.pos || !a.pos) return Infinity;
@@ -348,7 +358,8 @@ export function SpawnList({
     };
   }, [store, localTick]);
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: rows,
     columns,
     meta: { selectedId },
@@ -365,8 +376,6 @@ export function SpawnList({
     // remount churn dominates the per-tick cost (saw ~50 tr replacements
     // per second on a busy zone).
     getRowId: (row) => String(row.id),
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
   });
 
   // Row virtualization. With 5000+ spawns the unvirtualized <tbody>
@@ -808,7 +817,7 @@ export function SpawnList({
                       : 'hover:bg-bg-alt/60')
                   }
                 >
-                  {r.getVisibleCells().map((c) => (
+                  {r.getAllCells().map((c) => (
                     <td key={c.id} className="px-1.5 py-0.5 align-middle">
                       {flexRender(c.column.columnDef.cell, c.getContext())}
                     </td>

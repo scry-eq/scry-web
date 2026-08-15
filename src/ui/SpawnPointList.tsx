@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
+  columnResizingFeature,
+  columnSizingFeature,
   createColumnHelper,
+  createSortedRowModel,
   flexRender,
-  getCoreRowModel,
-  getSortedRowModel,
-  useReactTable,
+  rowSortingFeature,
+  tableFeatures,
+  useTable,
   type ColumnSizingState,
   type SortingState,
 } from '@tanstack/react-table';
@@ -48,7 +51,16 @@ type Row = {
   age: number;
 };
 
-const columnHelper = createColumnHelper<Row>();
+// v9 composes table behaviour from explicit features; only what we name here
+// is bundled. Sorting, plus resizable column widths.
+const features = tableFeatures({
+  rowSortingFeature,
+  columnSizingFeature,
+  columnResizingFeature,
+  sortedRowModel: createSortedRowModel(),
+});
+
+const columnHelper = createColumnHelper<typeof features, Row>();
 
 function fmtRemaining(s: number | null): string {
   if (s === null) return '?';
@@ -60,7 +72,7 @@ function fmtRemaining(s: number | null): string {
 }
 
 function buildColumns(onRename: (key: string, currentName: string, last: string) => void) {
-  return [
+  return columnHelper.columns([
     // Display X/Y in EQ /loc (runtime) convention to match legacy + the
     // status bar; row.x/row.y stay screen convention for pan-to + key
     // identity. See lib/coords.
@@ -85,7 +97,7 @@ function buildColumns(onRename: (key: string, currentName: string, last: string)
       cell: (info) => (
         <span className="font-mono">{fmtRemaining(info.getValue())}</span>
       ),
-      sortingFn: (a, b) => {
+      sortFn: (a, b) => {
         // null sorts last so unknown-cycle points settle at the bottom.
         const av = a.original.remainingS;
         const bv = b.original.remainingS;
@@ -115,7 +127,7 @@ function buildColumns(onRename: (key: string, currentName: string, last: string)
       cell: (info) => info.getValue() || '—',
     }),
     columnHelper.accessor('count', { header: 'Count', size: 60 }),
-  ];
+  ]);
 }
 
 export function SpawnPointList({
@@ -205,7 +217,8 @@ export function SpawnPointList({
     [client],
   );
 
-  const table = useReactTable({
+  const table = useTable({
+    features,
     data: rows,
     columns,
     state: { sorting, columnSizing },
@@ -216,8 +229,6 @@ export function SpawnPointList({
     // Stable row id so spawn-point churn doesn't shift TanStack ids and
     // unmount/remount every <tr>; matches the SpawnList convention.
     getRowId: (row) => row.key,
-    getCoreRowModel: getCoreRowModel(),
-    getSortedRowModel: getSortedRowModel(),
   });
 
   // Row virtualization — see SpawnList.tsx for rationale. Spawn-point
@@ -325,7 +336,7 @@ export function SpawnPointList({
                     onPanTo?.(r.original.x, r.original.y);
                   }}
                 >
-                  {r.getVisibleCells().map((c) => (
+                  {r.getAllCells().map((c) => (
                     <td key={c.id} className="px-1.5 py-0.5 align-middle">
                       {flexRender(c.column.columnDef.cell, c.getContext())}
                     </td>

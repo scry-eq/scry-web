@@ -18,7 +18,7 @@
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.14.0",
-    "@tanstack/react-table": "^8.21.3",
+    "@tanstack/react-table": "9",
     "@tanstack/react-virtual": "^3.14.9",
     "clsx": "^2.1.1",
     "lucide-react": "^1.31.0",
