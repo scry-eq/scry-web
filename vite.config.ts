@@ -19,6 +19,12 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
+    watch: {
+      // src-tauri/target is Rust build output — ~28k files, which alone blows
+      // past the system inotify limit and kills the dev server with ENOSPC.
+      // Tauri watches its own side; Vite has no reason to.
+      ignored: ['**/src-tauri/**'],
+    },
   },
   build: {
     chunkSizeWarningLimit: 700,
