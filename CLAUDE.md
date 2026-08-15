@@ -1,26 +1,76 @@
-Target server: both Live EQ (`../scry-cpp/`) and Project Quarm (`../scry-cpp-quarm/`). The web client must stay daemon-agnostic — it connects to whichever daemon is running and the user can switch between them.
-No hardcoded opcodes — use `scry-proto` enums only. The web layer should never branch on target server; if a feature seems to need target-specific code, the difference belongs in the daemon, not the client.
-Proto schema is unified — there is no Quarm-specific proto. Both daemons emit the same `seq.v1.*` messages. If a feature requires a new proto field, do it as part of scry-cpp (Live) work first; never request Quarm-only proto.
-Chat line label + colour is centralised in `src/lib/chatColors.ts`. Two key spaces: `cc:<id>` for raw EQ ChatColor (CC_*), `mt:<id>` MessageType fallback when chatColor=0. Unknown ids fall through to a gray `CC#<n>` / `#<n>` placeholder — when one shows up in the UI, add an entry to `CHAT_COLOR_ENTRIES` (label + default hex + category) rather than adding bespoke handling elsewhere. Categories drive the settings panel grouping.
-`SpawnStore` getters like `chatLog()` / `combatLog()` / `combatEvents()` return the SAME array reference forever and mutate in place via `push`. NEVER wrap them in `useMemo([fullLog])` — the dep never changes, the memo caches the initial empty filter result, and the panel renders empty forever. Filter inline (cheap; arrays are bounded by `*_HISTORY_LIMIT`). The `tick` prop is the re-render driver, not the array reference.
-Use `~/.bun/bin/bun` for all JS tooling — system Node 18 breaks Vite/Vitest.
-Scripts: `bun run dev` (Vite), `bun run gen` (regen TS bindings from `proto/` via buf), `bun run typecheck`, `bun run test` (vitest), `bun run test:e2e` (playwright), `bun run smoke`.
-UI stack: Tailwind v4, TanStack Table, shadcn/ui (Radix-backed, à la carte components under `src/components/ui/`), zustand for cross-cutting state (panel layout, behavioral toggles).
-Two zustand stores hold persisted UI state. Add new app-wide settings to one of them rather than to `App.tsx` `useState` + ad-hoc localStorage. `useLayoutStore` (`src/state/layoutStore.ts`, persists `scry.layout` v1) owns panel docking. `usePrefsStore` (`src/state/prefsStore.ts`, persists `scry.prefs` v1) owns the 6 user toggles: `selectOnConsider`, `selectOnTarget`, `deselectOnUntarget`, `trackPlayer`, `smoothMovement`, `predictiveMovement` (variant of `smoothMovement`: dead-reckons spawns forward along their velocity vector instead of easing toward the last-reported position — inert unless `smoothMovement` is also on; the algorithm lives in `PosSmoother` in `MapCanvas.tsx`). Both read legacy per-key localStorage on init so existing installs migrate without losing data. Read prefs from non-React contexts (e.g. envelope subscribers) via `usePrefsStore.getState().x` — don't capture toggle values in closures, the store is the live source of truth.
-`localPrefs` (`src/state/localPrefs.ts`) is now scoped to per-`FloatingWindow` pos/size only (`scry.windowPos.{id}` / `scry.windowSize.{id}`). Don't add app-wide settings here; it's component-local state with dynamic IDs.
-Spawn-filter state shared by SpawnList + MapCanvas lives in `src/state/spawnFilterStore.ts` (zustand, persisted to `scry.spawnFilters`) with a `passesSpawnFilter(spawn, state)` predicate both surfaces apply — MapCanvas passes the whole store object as the predicate state, so any field added here is honored on the map for free (no MapCanvas edit needed). Fields: `categoryFilter`, `hideFiltered`, `nameFilter`, level band — either absolute `levelMin`/`levelMax` (0 = unbounded that side) OR `levelRelative`+`levelRelLow`/`levelRelHigh` (signed "±Me" offsets resolved by `resolveLevelBand` against the live, non-persisted `playerLevel` that App syncs each tick; the relative band no-ops when level is unknown) — `types` (npc/pc/corpse buckets via `spawnTypeBucket`; there is no PET on the wire, pets ride under NPC), plus named `presets` (`savePreset`/`applyPreset`/`deletePreset` — each snapshots all filter values; `applyPreset` deep-clones so presets don't alias live state). The advanced level+type controls live in a collapsed "Filters ▾" section in SpawnList's header. Add new shared spawn filters here, not as fresh `useState` in each panel. Filters do NOT pierce selection — hidden means hidden across both surfaces (the map's Z-window height filter is SEPARATE MapCanvas-local state — useState+localStorage+ref — and still pierces).
-`useLayoutStore` shape: `visibility` (View-menu toggles), `dockLocation` (`left`/`right`/`floating` per PanelKey), `panelOrder` (per-rail key arrays — drives render order so reorder = move within array), `panelsLocked` (freezes detach affordances), `statusBarVisible`, `railWidths`, `leftSplit`, `railCollapsed` (`{left,right}` whole-rail collapse — keeps panels assigned but hides the rail body so the map gets the space; App renders a thin reopen strip via `CollapsedRail` plus a collapse chevron on `RailDivider`, and auto-expands a collapsed rail when a panel is docked onto it). Actions: `togglePanel`/`hidePanel`/`setPanelsLocked`/`setStatusBarVisible`/`setLeftRailWidth`/`setRightRailWidth`/`setLeftSplit`/`toggleRailCollapsed`/`setRailCollapsed`/`undock`/`dockToSlot`/`resetDockTo`/`resetLayout`. Defaults: `DEFAULT_DOCK_LOCATION` / `DEFAULT_PANEL_ORDER` / `DEFAULT_VISIBILITY`. `resetLayout` also wipes `scry.windowPos.panel.*` / `scry.windowSize.panel.*` and clears `railCollapsed`.
-Floating popups must wrap `src/ui/FloatingWindow.tsx` — handles drag (react-draggable, controlled `position={pos}` mode + `setPos` on every `onDrag` because the store tick re-renders the parent ~1Hz and uncontrolled mode snaps back), SE-corner resize, persistence via `localPrefs.windowPos(id)` + `windowSize(id)`. Position is an offset from CSS-centered (`{0,0}` = viewport-centered); first open is centered, drags persist a delta.
-Detached dock panels reuse the same FloatingWindow with id namespace `panel.<key>` — keeps `panel.stats` (Player rail panel detached) separate from `stats` (the existing `StatsWindow`). The 5 floating utility windows (loot/skills/aa/stats/inventoryStats) keep bare ids.
-Drag-out gesture (Panel header pointerdown → 6 px threshold → undock) hands the active press off to the new floating window via `flushSync(undock)` + a synthetic `mousedown` on `[data-fw-id="panel.{key}"] .fw-drag-handle` at the current cursor — same-tick handoff so the drag continues without a release+reclick. Don't switch to rAF-based timing here; the gap re-introduces a visible jump on small panels (Buffs).
-Snap-to-rail uses `SnapZones.tsx` overlay during floating-panel drags. `hitTest()` returns `{side, slot}`; `slot` is computed from cursor Y vs each docked panel's mid-line in the target rail. Drop = `dockToSlot(key, side, slot)` which splices the key into `panelOrder[side]` at the chosen index.
-Tests live in two layers. Unit tests: vitest, `src/**/*.test.ts`, happy-dom env (provides localStorage), run via `bun run test`. Cover store logic — slot insertion edge cases, legacy migration, persistence round-trip, action mutations. E2E: playwright, `e2e/**/*.spec.ts`, run via `bun run test:e2e` against the local vite dev server (auto-started via `webServer` config). Cover real pointer mechanics — drag/resize, the drag-out flushSync handoff, snap-zone overlay, menu wiring, persistence across reload. CI runs both on every push and PR (`.github/workflows/ci.yml`); failed playwright runs upload the report as an artifact. New unit-test-able logic should land in `src/**/*.test.ts`; reach for playwright only when the behavior depends on real pointer events or DOM layout.
-Reading live state from chrome MCP: spawn position cache lives in a `Map<spawnId, {prevX, prevY, targetX, targetY, updateTimeMs}>` at variable fiber depth. Recipe: walk UP from the canvas element — `canvas[Object.keys(canvas).find(k=>k.startsWith('__reactFiber'))]`, then `.return.return` reaches MapCanvas — then walk its `memoizedState.next` chain for `.current.positions instanceof Map` whose first-value has `targetX`. Do NOT start from `document.getElementById('root')`: root has key `__reactContainer$...` not `__reactFiber$...` and the walk is harder from there. Check `document.visibilityState !== 'hidden'` before debugging the render loop — rAF freezes in background tabs, making fpc=0 and smoother appear frozen when it's actually fine. Spawn list table data is at `f*.h*.current.options.data` (array of `{id, name, level, klass, hpPct, distance, conColor, filterFlags, type}` — has `distance` not `x/y`).
-`scripts/diag-movement.ts` — standalone bun script connecting directly to the daemon WebSocket; measures live position update rates, step sizes, and dt distributions without needing Chrome tab focus. Run: `~/.bun/bin/bun run scripts/diag-movement.ts [ws://host:port]`. Preferred over Playwright for smooth-movement diagnosis.
-`scripts/watch-smoother.ts` — Playwright headless-Chrome smoother watcher; requires tab in foreground (rAF freezes when hidden). Use `diag-movement.ts` instead for live capture; this is better for watching visual lerp state.
-MapCanvas.tsx view toggles (grid, FPS cap, height filter, …) use a local `useState` + localStorage + ref pattern: the render-loop `useEffect` deps are `[store]` only, so toggle state changes don't restart the loop — refs (`showGridRef`, etc.) carry live values in. Keep new map-local toggles in this shape; don't promote them to `usePrefsStore`.
-Map filters should let the selected spawn pierce — always draw + keep in hit-testing + keep the magenta connector even when out-of-band/category/etc. — so the user can still navigate to it. Apply this to any future filter, not just the height filter.
-Coordinate CONVENTION: the daemon ships positions in SCREEN convention (`protoencoder.cpp fillPos` negates EQ runtime X/Y; Z ships raw). The map renders directly in that convention (identity `project()`), so dot/line/grid GEOMETRY is correct as-is — but any coordinate NUMBER shown to the user must be flipped back to EQ /loc convention (Y, X, Z) via `src/lib/coords.ts` (`formatLoc` / `runtimeX` / `runtimeY`), or it reads negated/backwards vs in-game `/loc` and legacy showeq (legacy stays un-negated internally + mirrors in its projection, so its grid labels are already runtime). Route ALL new coordinate readouts (tooltips, grid ticks, panel X/Y columns) through these helpers — status bar, map `HoverTip`, map grid labels, and the Spawn Points X/Y columns already do.
-`concolor.ts` is the con-color source of truth and is **derived from the client's own runtime con table**, not from the legacy `Player::fillConTable` ladder that used to back it (that ladder capped yellow at +3 and was off by one at the grey/green edge on 19 player levels). The client builds a 131x131 int8 table at startup indexed `[myLevel][targetLevel]`; its builder reduces to the closed form in `conOf` — `cyanBase`/`greenBase` scale as 3/4 and 2/3 of player level until 60, then flatten to -15/-20, each clamped against the band above. Two mirrors of this logic exist and must be changed together: `../iced-miseru/src/concolor.rs` and (for the GUI's con table) `../showeq/src/player.cpp`. The daemons deliberately carry **no** con logic — level ships raw and the client colors it. Treat live con reports as ground truth over the formula; if one disagrees, re-derive against the client binary rather than re-introducing a per-level ladder, and add the case to `concolor.test.ts`.
-Floating panels reading async store data (e.g. `store.inspectFor()`, `store.byId()`) need a `tick` prop to re-render when data arrives — the store mutates in place and React won't re-render otherwise. Pass App's global `tick` (1s setInterval). Same pattern as `PlayerPanel`, `BuffsPanel`, etc.
-Static EQ lookup tables: `src/lib/equipModels.ts` (weapon model codes + armor materials, `equipSummary()` produces legacy-style "C:Leather 1:MorningStar" strings), `src/lib/races.ts` (full race ID→name table). `classShortOf(id)` in `src/ui/classes.ts` returns WAR/CLR/PAL/RNG/SHD/etc.
+# scry-web
+
+React/TypeScript web client — connects to a scry daemon (`scry-cpp` or
+`scry-cpp-quarm`) over WebSocket, speaking `seq.v1` protobuf. Daemon-agnostic:
+the client never knows or branches on which server it's talking to. See
+[`docs/architecture.md`](docs/architecture.md) for state management, the
+floating-window/docking system, and the coordinate/con-color conventions.
+
+## Stack
+
+- React + TypeScript, Vite.
+- Tailwind v4, TanStack Table, shadcn/ui (Radix-backed, à la carte
+  components under `src/components/ui/`), zustand for cross-cutting state.
+- **Use `~/.bun/bin/bun` for all JS tooling** — system Node 18 breaks
+  Vite/Vitest.
+
+## Structure
+
+- `src/lib/` — `chatColors.ts`, `coords.ts`, `equipModels.ts`, `races.ts`
+- `src/state/` — `layoutStore.ts`, `prefsStore.ts`, `spawnFilterStore.ts`,
+  `localPrefs.ts`
+- `src/ui/` — components, incl. `FloatingWindow.tsx`, `SnapZones.tsx`,
+  `concolor.ts`, `classes.ts`
+- `src/**/*.test.ts` — vitest unit tests (happy-dom env)
+- `e2e/**/*.spec.ts` — playwright e2e tests
+- `scripts/` — `diag-movement.ts`, `watch-smoother.ts` (live-state
+  diagnostics — see `docs/architecture.md`)
+- `proto/` — git submodule → `scry-proto`
+
+## Commands
+
+- `bun run dev` — Vite dev server
+- `bun run gen` — regenerate TS bindings from `proto/` via buf
+- `bun run typecheck`
+- `bun run test` — vitest unit tests
+- `bun run test:e2e` — playwright e2e tests (against the local vite dev
+  server, auto-started)
+- `bun run smoke`
+
+## Conventions
+
+- **No hardcoded opcodes** — use `scry-proto` enums only.
+- **The web layer never branches on target server.** If a feature seems to
+  need target-specific code, the difference belongs in the daemon, not
+  here.
+- **Proto schema is unified** — there is no Quarm-specific proto; both
+  daemons emit the same `seq.v1.*` messages. If a feature needs a new proto
+  field, do the proto work as part of `scry-cpp` (Live) first; never
+  request Quarm-only proto.
+- New app-wide settings go into one of the three zustand stores (see
+  `docs/architecture.md`), never into `App.tsx` `useState` + ad-hoc
+  localStorage.
+
+## Gotchas
+
+- **`SpawnStore` getters (`chatLog()`/`combatLog()`/`combatEvents()`)
+  return the SAME array reference forever and mutate in place.** Never
+  wrap them in `useMemo([fullLog])` — the dependency never changes, so the
+  memo caches the initial (often empty) result and the panel renders empty
+  forever. Filter inline; the `tick` prop is the re-render driver, not the
+  array reference.
+
+## Before Committing
+
+- `bun run typecheck`
+- `bun run test` and `bun run test:e2e` — CI runs both on every push and
+  PR; a failed playwright run uploads its report as an artifact. New
+  unit-testable logic belongs in `src/**/*.test.ts`; reach for playwright
+  only when the behavior depends on real pointer events or DOM layout.
+
+## Documentation
+
+- [`docs/architecture.md`](docs/architecture.md) — state management (the
+  three zustand stores + `localPrefs`), the FloatingWindow/panel-docking
+  system, the coordinate convention, con-color/chat-color source of truth,
+  map rendering rules, and live-state debugging recipes.
