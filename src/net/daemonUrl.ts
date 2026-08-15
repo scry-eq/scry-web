@@ -16,15 +16,14 @@ export function daemonUrl(): string {
 /**
  * `SCRY_DAEMON_URL=...` / `--url ...` from the desktop shell, or null.
  *
- * Wins over the stored value and is written back to it, so it is a way to CORRECT a bad
- * address rather than a parallel setting — the field shows what is in use, and the next
- * launch without the override keeps it.
+ * Wins over the stored value and is written back to it, so it CORRECTS a bad address rather
+ * than shadowing it — the field shows what is in use, and the next launch without the
+ * override keeps it.
  */
 export async function daemonUrlOverride(): Promise<string | null> {
-  if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return null;
+  if (typeof window === 'undefined' || !window.scry) return null;
   try {
-    const { invoke } = await import('@tauri-apps/api/core');
-    return await invoke<string | null>('daemon_url_override');
+    return await window.scry.daemonUrlOverride();
   } catch {
     return null;
   }

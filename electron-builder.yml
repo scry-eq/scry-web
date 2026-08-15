@@ -1,0 +1,18 @@
+appId: com.scryeq.web
+productName: scry-web
+directories:
+  buildResources: build
+files:
+  - out/**
+  - '!**/*.map'
+win:
+  target: [nsis, portable]
+  artifactName: ${name}-${version}-${arch}.${ext}
+mac:
+  target: [dmg]
+linux:
+  target: [AppImage]
+  category: Utility
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true

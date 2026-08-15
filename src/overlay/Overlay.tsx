@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Lock, LockOpen, X } from 'lucide-react';
-import { onHover, onLocked, overlay, inTauri } from './bridge';
+import { overlay } from './bridge';
 import { useDaemon } from './useDaemon';
 
 const DOT: Record<string, string> = {
@@ -28,65 +28,83 @@ function Bar({ label, cur, max, className }: {
 
 export function Overlay() {
   const vitals = useDaemon();
-  // Locked is the resting state and Rust owns it; these mirror it for rendering only.
-  const [locked, setLocked] = useState(true);
-  const [hover, setHover] = useState(!inTauri);
+  const api = overlay();
+  const [locked, setLocked] = useState(false);
+  const [hover, setHover] = useState(!api);
+  // Where the pointer cannot be seen through a click-through window, the chrome must stay
+  // put — otherwise locking hides the only control that unlocks it.
+  const [forwards, setForwards] = useState(true);
   const headerRef = useRef<HTMLDivElement>(null);
+  // What we last asked main for, so an unchanged answer costs no IPC.
+  const ignoring = useRef<boolean | null>(null);
 
   useEffect(() => {
-    const un = [onHover((h) => setHover(h.inside)), onLocked(setLocked)];
-    void overlay.locked().then(setLocked);
-    return () => { un.forEach((p) => void p.then((f) => f())); };
-  }, []);
+    if (!api) return;
+    void api.locked().then(setLocked);
+    void api.forwardsMouse().then(setForwards);
+    return api.onLockedChanged(setLocked);
+  }, [api]);
 
-  // The header is what stays clickable while locked, so its real rectangle is what Rust is
-  // told — and it is measured while HIDDEN, since that is exactly when the user has to be
-  // able to reach into it to bring it back.
-  useLayoutEffect(() => {
-    const push = () => {
-      const el = headerRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      void overlay.setHotZones([{ x: r.x, y: r.y, w: r.width, h: r.height }]);
+  // THE WHOLE HOVER MECHANISM. A locked overlay is click-through, but `forward: true` keeps
+  // mouse-moves arriving, so the window can still tell where the pointer is and hand capture
+  // back for the header — which is why there is no cursor sampling and no hot-zone bookkeeping
+  // anywhere in this app.
+  useEffect(() => {
+    if (!api) return;
+    const ask = (ignore: boolean): void => {
+      if (ignoring.current === ignore) return;
+      ignoring.current = ignore;
+      void api.setIgnoreMouse(ignore);
     };
-    push();
-    const ro = new ResizeObserver(push);
-    if (headerRef.current) ro.observe(headerRef.current);
-    window.addEventListener('resize', push);
-    return () => { ro.disconnect(); window.removeEventListener('resize', push); };
-  }, []);
+    const onMove = (e: MouseEvent): void => {
+      setHover(true);
+      const r = headerRef.current?.getBoundingClientRect();
+      const overChrome = !!r && e.clientY >= r.top && e.clientY <= r.bottom;
+      ask(locked && !overChrome);
+    };
+    const onLeave = (): void => {
+      setHover(false);
+      ask(locked);
+    };
+    window.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseleave', onLeave);
+    return () => {
+      window.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseleave', onLeave);
+    };
+  }, [api, locked]);
 
-  const chrome = hover || !locked;
+  const chrome = hover || !locked || !forwards;
 
-  // Opaque enough to read against a bright zone AND a dark one: the empty state has no
-  // data to draw, so the panel itself has to be the thing you see.
   return (
     <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/25 bg-black/75 text-foreground shadow-lg backdrop-blur-sm">
-      {/* Always mounted, never display:none — a hot zone with no rectangle is an overlay
-          that can never be unlocked again. */}
+      {/* Always mounted, never display:none — the pointer has to be able to find it to get
+          the overlay back, so only its opacity changes. */}
       <div
         ref={headerRef}
-        data-tauri-drag-region
+        style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
         className={`flex h-7 shrink-0 items-center gap-2 border-b px-2 transition-opacity duration-150 ${
           chrome ? 'border-white/10 bg-white/5 opacity-100' : 'border-transparent opacity-0'
         }`}
       >
         <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[vitals.status]}`} />
-        <span data-tauri-drag-region className="min-w-0 flex-1 truncate text-[11px] opacity-70">
+        <span className="min-w-0 flex-1 truncate text-[11px] opacity-70">
           {vitals.zone || 'no zone'}
         </span>
         <button
           type="button"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           title={locked ? 'Unlock (click-through off)' : 'Lock (click-through on)'}
-          onClick={() => void overlay.setLocked(!locked)}
+          onClick={() => void api?.setLocked(!locked)}
           className="rounded p-0.5 opacity-70 hover:bg-white/10 hover:opacity-100"
         >
           {locked ? <Lock size={12} /> : <LockOpen size={12} />}
         </button>
         <button
           type="button"
+          style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}
           title="Close"
-          onClick={() => void overlay.close()}
+          onClick={() => void api?.close()}
           className="rounded p-0.5 opacity-70 hover:bg-white/10 hover:opacity-100"
         >
           <X size={12} />

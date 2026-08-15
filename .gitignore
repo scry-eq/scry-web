@@ -25,3 +25,8 @@ src-tauri/target/
 
 # Claude Code local session state (cozempic hooks, worktrees)
 .claude/
+
+# electron-vite output
+out/
+# electron-builder output
+release/
