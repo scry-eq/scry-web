@@ -252,6 +252,73 @@ pub fn overlay_set_locked(app: AppHandle, locked: bool) {
   }
 }
 
+/// What the overlay window actually IS right now, straight from the OS. Reported into the
+/// main window's UI because that window demonstrably works — a log file in an OS-specific
+/// directory is no use when the question is "did anything happen at all".
+#[derive(Serialize)]
+pub struct Status {
+  exists: bool,
+  visible: bool,
+  x: i32,
+  y: i32,
+  w: u32,
+  h: u32,
+  scale: f64,
+  locked: bool,
+  opaque: bool,
+  monitors: Vec<String>,
+}
+
+#[tauri::command]
+pub fn overlay_status(app: AppHandle) -> Status {
+  let monitors = app
+    .primary_monitor()
+    .ok()
+    .flatten()
+    .into_iter()
+    .chain(app.available_monitors().unwrap_or_default())
+    .map(|m| {
+      let p = m.position();
+      let s = m.size();
+      format!("{}x{}+{}+{}@{}", s.width, s.height, p.x, p.y, m.scale_factor())
+    })
+    .collect();
+
+  let Some(w) = app.get_webview_window(LABEL) else {
+    return Status {
+      exists: false,
+      visible: false,
+      x: 0,
+      y: 0,
+      w: 0,
+      h: 0,
+      scale: 0.0,
+      locked: false,
+      opaque: false,
+      monitors,
+    };
+  };
+  let pos = w.outer_position().unwrap_or_default();
+  let size = w.inner_size().unwrap_or_default();
+  let st = Status {
+    exists: true,
+    visible: w.is_visible().unwrap_or(false),
+    x: pos.x,
+    y: pos.y,
+    w: size.width,
+    h: size.height,
+    scale: w.scale_factor().unwrap_or(0.0),
+    locked: app.state::<OverlayState>().locked.load(Ordering::Relaxed),
+    opaque: std::env::var_os("SCRY_OVERLAY_OPAQUE").is_some(),
+    monitors,
+  };
+  log::info!(
+    "overlay status: visible={} pos={},{} size={}x{} scale={} locked={} opaque={} monitors={:?}",
+    st.visible, st.x, st.y, st.w, st.h, st.scale, st.locked, st.opaque, st.monitors
+  );
+  st
+}
+
 #[tauri::command]
 pub fn overlay_locked(app: AppHandle) -> bool {
   app.state::<OverlayState>().locked.load(Ordering::Relaxed)

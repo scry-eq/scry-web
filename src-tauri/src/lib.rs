@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use tauri::Manager;
@@ -29,6 +30,27 @@ const TITLES: &[&str] = &[
   "New Tab",
 ];
 
+/// Where the log goes. The OS log dir is the right home for it, but it is also a place a
+/// user has to be told how to find — so the exe's own directory gets a copy. When someone is
+/// running a build straight out of a shared build tree, that is the one file both ends can
+/// already see.
+fn log_targets() -> Vec<tauri_plugin_log::Target> {
+  use tauri_plugin_log::{Target, TargetKind};
+  let mut targets = vec![
+    Target::new(TargetKind::Stdout),
+    Target::new(TargetKind::LogDir {
+      file_name: Some("scry-web".into()),
+    }),
+  ];
+  if let Some(dir) = std::env::current_exe().ok().and_then(|e| e.parent().map(Path::to_path_buf)) {
+    targets.push(Target::new(TargetKind::Folder {
+      path: dir,
+      file_name: Some("scry-web".into()),
+    }));
+  }
+  targets
+}
+
 /// One of TITLES. The counter keeps two windows opened in the same nanosecond from
 /// landing on the same label.
 pub(crate) fn bland_title() -> &'static str {
@@ -48,6 +70,7 @@ pub fn run() {
       overlay::overlay_open,
       overlay::overlay_close,
       overlay::overlay_locked,
+      overlay::overlay_status,
       overlay::overlay_set_locked,
       overlay::overlay_set_hot_zones,
     ])
@@ -59,14 +82,16 @@ pub fn run() {
       app.handle().plugin(
         tauri_plugin_log::Builder::default()
           .level(log::LevelFilter::Info)
-          .targets([
-            tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
-            tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
-              file_name: Some("scry-web".into()),
-            }),
-          ])
+          .targets(log_targets())
           .build(),
       )?;
+      // First line in the log, so "is the log even being written / is this the binary I
+      // think it is" is answerable without reproducing anything.
+      log::info!(
+        "scry-web {} starting, built {}",
+        env!("CARGO_PKG_VERSION"),
+        env!("SCRY_BUILD_ID")
+      );
       // Cover any window the user/config defines, not just "main", in case
       // the label is renamed or extra windows get added later.
       for (_, w) in app.webview_windows() {
