@@ -1,87 +1,15 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
-import {
-  EnvelopeSchema,
-  LootPageSchema,
-  SnapshotSchema,
-  SpawnPointSchema,
-  SpawnSchema,
-} from '../src/gen/seq/v1/events_pb';
-import { ClientEnvelopeSchema } from '../src/gen/seq/v1/client_pb';
+import { LOOT, POINTS, SPAWNS, mockDaemon } from './fixtures/daemon';
 
 // The three TanStack tables — Spawns, Spawn Points and the Loot browser —
 // driven by real seq.v1 frames over a mocked daemon socket, so sorting and
 // resizing are exercised against actual rows. The panel suite renders these
 // panels but never looks inside them.
 //
-// Fixtures are ordered so no column's sorted order matches the order the
-// daemon sent them in: a table that ignored its sort state would otherwise
-// pass. Levels and counts also straddle a decade boundary (3 vs 41 vs 55) so
-// a lexical sort is distinguishable from a numeric one.
-
-const SPAWNS = [
-  { id: 1, name: 'Miragul', level: 55, class: 12, hpCur: 30, hpMax: 100 },
-  { id: 2, name: 'a bat', level: 3, class: 1, hpCur: 100, hpMax: 100 },
-  { id: 3, name: 'Zordak', level: 41, class: 9, hpCur: 70, hpMax: 100 },
-  { id: 4, name: 'Cazic Thule', level: 70, class: 1, hpCur: 55, hpMax: 100 },
-];
-
-const POINTS = [
-  { key: 'sp-c', name: 'orc pawn', x: 30, y: 30, z: 0, count: 7 },
-  { key: 'sp-a', name: 'a griffon', x: 10, y: 10, z: 0, count: 21 },
-  { key: 'sp-b', name: 'Vox', x: 20, y: 20, z: 0, count: 2 },
-];
-
-const LOOT = [
-  { ts: 300n, itemName: 'Rusty Dagger', itemId: 11, qty: 3, mobName: 'a bat', zoneBase: 'qeynos' },
-  { ts: 100n, itemName: 'Abacus', itemId: 33, qty: 5, mobName: 'Zordak', zoneBase: 'freeport' },
-  { ts: 200n, itemName: 'Mithril Bar', itemId: 22, qty: 2, mobName: 'Vox', zoneBase: 'permafrost' },
-];
-
-function snapshotFrame(): Uint8Array {
-  return toBinary(
-    EnvelopeSchema,
-    create(EnvelopeSchema, {
-      seq: 1n,
-      payload: {
-        case: 'snapshot',
-        value: create(SnapshotSchema, {
-          sessionId: 'e2e',
-          zoneShort: 'qeynos',
-          zoneLong: 'South Qeynos',
-          spawns: SPAWNS.map((s) =>
-            create(SpawnSchema, { ...s, type: 1, pos: { x: 0, y: 0, z: 0 } }),
-          ),
-          spawnPoints: POINTS.map((p) => create(SpawnPointSchema, p)),
-        }),
-      },
-    }),
-  );
-}
-
-function lootFrame(): Uint8Array {
-  return toBinary(
-    EnvelopeSchema,
-    create(EnvelopeSchema, {
-      seq: 2n,
-      payload: { case: 'lootPage', value: create(LootPageSchema, { rows: LOOT }) },
-    }),
-  );
-}
-
-// Both daemon sockets: the main stream answers Subscribe with a Snapshot,
-// and /loot answers a LootQuery with a LootPage.
-async function mockDaemon(page: Page) {
-  await page.routeWebSocket(/localhost:9090/, (ws) => {
-    const isLoot = new URL(ws.url()).pathname === '/loot';
-    ws.onMessage((msg) => {
-      const bytes = typeof msg === 'string' ? new TextEncoder().encode(msg) : new Uint8Array(msg);
-      const kind = fromBinary(ClientEnvelopeSchema, bytes).payload.case;
-      if (!isLoot && kind === 'subscribe') ws.send(Buffer.from(snapshotFrame()));
-      if (isLoot && kind === 'lootQuery') ws.send(Buffer.from(lootFrame()));
-    });
-  });
-}
+// The shared fixtures are ordered so no column's sorted order matches the
+// order the frames arrive in: a table that ignored its sort state would
+// otherwise pass. Levels and counts straddle a decade boundary (3 vs 41 vs
+// 55) so a lexical sort is distinguishable from a numeric one.
 
 const panel = (page: Page, title: string) =>
   page.locator('section', { has: page.locator('header span', { hasText: new RegExp(`^${title}$`) }) });
