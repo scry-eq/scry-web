@@ -52,13 +52,21 @@ pub fn run() {
       overlay::overlay_set_hot_zones,
     ])
     .setup(|app| {
-      if cfg!(debug_assertions) {
-        app.handle().plugin(
-          tauri_plugin_log::Builder::default()
-            .level(log::LevelFilter::Info)
-            .build(),
-        )?;
-      }
+      // Release builds log too, to a file. A packaged app has no console, and the overlay
+      // is a window that can fail by being invisible — without this there is nothing to
+      // read when it does. Path is the OS log dir for the bundle identifier, e.g.
+      // %LOCALAPPDATA%\com.scryeq.web\logs on Windows.
+      app.handle().plugin(
+        tauri_plugin_log::Builder::default()
+          .level(log::LevelFilter::Info)
+          .targets([
+            tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::Stdout),
+            tauri_plugin_log::Target::new(tauri_plugin_log::TargetKind::LogDir {
+              file_name: Some("scry-web".into()),
+            }),
+          ])
+          .build(),
+      )?;
       // Cover any window the user/config defines, not just "main", in case
       // the label is renamed or extra windows get added later.
       for (_, w) in app.webview_windows() {

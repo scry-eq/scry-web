@@ -17,6 +17,7 @@ use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Mutex;
 
 use serde::{Deserialize, Serialize};
+use tauri::window::Color;
 use tauri::{AppHandle, Emitter, Manager, WebviewUrl, WebviewWindow, WebviewWindowBuilder};
 
 pub const LABEL: &str = "overlay";
@@ -93,6 +94,10 @@ fn note_inside(w: &WebviewWindow, state: &OverlayState, inside: bool, lx: f64, l
 
 /// Alt-Tab exclusion. `skip_taskbar` is ITaskbarList::DeleteTab, which deletes the taskbar
 /// button only; WS_EX_TOOLWINDOW is the style Alt-Tab and Win+Tab actually consult.
+///
+/// MUST be re-applied after every tao flag change — `show`, `set_focusable`, anything that
+/// reaches `WindowState::apply_diff`, which rewrites the WHOLE ex-style word from tao's own
+/// cached flags (`SetWindowLongW(GWL_EXSTYLE, ...)`) and silently drops ours.
 #[cfg(target_os = "windows")]
 fn platform_tune(w: &WebviewWindow) {
   use windows::Win32::UI::WindowsAndMessaging::{
@@ -143,12 +148,18 @@ pub fn overlay_open(app: AppHandle) -> Result<(), String> {
     return Ok(());
   }
 
-  let w = WebviewWindowBuilder::new(&app, LABEL, WebviewUrl::App("overlay.html".into()))
+  // OPAQUE COMPATIBILITY MODE. A transparent window is composited per-pixel by the driver,
+  // and a machine that cannot do it renders the overlay as nothing at all — which is
+  // indistinguishable from a window that was never shown. Opaque, the window paints a solid
+  // native background before the webview has drawn anything, so "is it there?" stops being a
+  // question. Env var for now; a preference once there is somewhere to put it.
+  let opaque = std::env::var_os("SCRY_OVERLAY_OPAQUE").is_some();
+
+  let mut builder = WebviewWindowBuilder::new(&app, LABEL, WebviewUrl::App("overlay.html".into()))
     .title(crate::bland_title())
     .inner_size(340.0, 200.0)
     .min_inner_size(180.0, 90.0)
     .decorations(false)
-    .transparent(true)
     .always_on_top(true)
     .visible_on_all_workspaces(true)
     .skip_taskbar(true)
@@ -156,16 +167,33 @@ pub fn overlay_open(app: AppHandle) -> Result<(), String> {
     // Born unfocusable so the first paint cannot pull the foreground off the game: tao
     // picks SW_SHOWNOACTIVATE for a window without focusability, which is Electron's
     // showInactive().
-    .focusable(false)
+    // `focused(false)` is what keeps the foreground on the game (it is the flag tao turns
+    // into SW_SHOWNOACTIVATE). Focus*able* stays on, so the panel can be dragged and locked
+    // before the user hands it over to the game.
+    .focusable(true)
     .focused(false)
     .visible(false)
-    .build()
-    .map_err(|e| e.to_string())?;
+    // Somewhere the eye already is. Without this an undecorated window is a WS_POPUP, and
+    // Windows resolves CW_USEDEFAULT for a popup to (0,0) — a translucent panel wedged in
+    // the top-left corner, absent from the taskbar and from Alt-Tab, is invisible in
+    // practice even when it is on screen.
+    .center();
+
+  builder = if opaque {
+    // Alpha is ignored for the window layer on Windows, so this is the solid colour the
+    // frame paints with; the page's own rgba then draws on top of it.
+    builder.background_color(Color(18, 18, 20, 255))
+  } else {
+    builder.transparent(true)
+  };
+
+  let w = builder.build().map_err(|e| e.to_string())?;
 
   let state = app.state::<OverlayState>();
-  // Locked is the resting state — an overlay you have to unlock to touch cannot eat a click
-  // during a fight.
-  state.locked.store(true, Ordering::Relaxed);
+  // UNLOCKED on first open. Locked is the resting state for play, but locked means
+  // click-through with the chrome hidden — i.e. a panel with no visible controls and no way
+  // to find it. The user locks it once they can see where they put it.
+  state.locked.store(false, Ordering::Relaxed);
   state.inside.store(false, Ordering::Relaxed);
   state.hot.lock().unwrap().clear();
 
@@ -175,9 +203,28 @@ pub fn overlay_open(app: AppHandle) -> Result<(), String> {
   let tuned = w.clone();
   let handle = app.clone();
   let _ = app.run_on_main_thread(move || {
+    // Show BEFORE tuning: showing is a flag change, and a flag change rewrites the ex-style.
+    let _ = tuned.show();
     platform_tune(&tuned);
     sensor::install(&handle, &tuned);
-    let _ = tuned.show();
+    log::info!(
+      "overlay opened: opaque={opaque} pos={:?} size={:?} visible={:?} scale={:?}",
+      tuned.outer_position(),
+      tuned.inner_size(),
+      tuned.is_visible(),
+      tuned.scale_factor()
+    );
+  });
+
+  // …and again once the show has actually landed. `show()` only QUEUES the flag change —
+  // the `visible=false` in the line above is logged after calling it — so the ex-style
+  // rewrite in tao's apply_diff arrives after the tuning we just did and drops it.
+  // platform_tune only ORs bits, so running it twice costs nothing.
+  let late = w.clone();
+  let handle2 = app.clone();
+  std::thread::spawn(move || {
+    std::thread::sleep(std::time::Duration::from_millis(400));
+    let _ = handle2.run_on_main_thread(move || platform_tune(&late));
   });
   Ok(())
 }
@@ -199,6 +246,9 @@ pub fn overlay_set_locked(app: AppHandle, locked: bool) {
     sensor::relock(&app, &w, locked);
     let _ = w.set_focusable(!locked);
     let _ = w.emit_to(LABEL, "overlay://locked", locked);
+    // set_focusable just rewrote the ex-style word; put ours back.
+    let retune = w.clone();
+    let _ = app.run_on_main_thread(move || platform_tune(&retune));
   }
 }
 

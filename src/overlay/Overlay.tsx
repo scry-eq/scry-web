@@ -16,7 +16,7 @@ function Bar({ label, cur, max, className }: {
   return (
     <div className="flex items-center gap-2">
       <span className="w-6 shrink-0 text-[10px] uppercase tracking-wide opacity-60">{label}</span>
-      <div className="h-2.5 flex-1 overflow-hidden rounded-sm bg-black/50">
+      <div className="h-2.5 flex-1 overflow-hidden rounded-sm bg-white/10">
         <div className={`h-full ${className}`} style={{ width: `${pct}%` }} />
       </div>
       <span className="w-16 shrink-0 text-right font-mono text-[10px] tabular-nums opacity-80">
@@ -58,8 +58,10 @@ export function Overlay() {
 
   const chrome = hover || !locked;
 
+  // Opaque enough to read against a bright zone AND a dark one: the empty state has no
+  // data to draw, so the panel itself has to be the thing you see.
   return (
-    <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/10 bg-black/55 text-foreground shadow-lg backdrop-blur-sm">
+    <div className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/25 bg-black/75 text-foreground shadow-lg backdrop-blur-sm">
       {/* Always mounted, never display:none — a hot zone with no rectangle is an overlay
           that can never be unlocked again. */}
       <div

@@ -81,7 +81,14 @@ Tauri commands do not, and NSWindow mutation is main-thread-only.
 
 - **Windows** — `WS_EX_TOOLWINDOW`. Tauri's `skip_taskbar` is
   `ITaskbarList::DeleteTab`, which deletes the taskbar button only; Alt-Tab and
-  Win+Tab consult `WS_EX_TOOLWINDOW`.
+  Win+Tab consult `WS_EX_TOOLWINDOW`. **It must be re-applied after every tao
+  flag change.** `WindowState::apply_diff` rewrites the *whole* ex-style word
+  from tao's own cached flags (`SetWindowLongW(GWL_EXSTYLE, …)`), so anything
+  set behind its back is silently dropped by the next `show` / `set_focusable`
+  / `set_always_on_top`. And `show()` only *queues* that change — it returns
+  before `is_visible()` is even true — so "tune after show" is not enough on
+  its own; there is a deferred re-apply as well. `platform_tune` only ORs bits,
+  so running it repeatedly is free.
 - **macOS** — `NSWindow.level` and `collectionBehavior`. `set_always_on_top`
   gives `NSFloatingWindowLevel` (3) only, which a game window can sit above, and
   a floating window is otherwise confined to its own Space. Set to
@@ -90,6 +97,24 @@ Tauri commands do not, and NSWindow mutation is main-thread-only.
 - macOS transparency additionally needs `app.macOSPrivateApi: true` plus the
   `macos-private-api` feature — without it `WebviewWindowBuilder::transparent`
   is `#[cfg]`-compiled away on that target and the build fails.
+
+## First open
+
+Centered, **unlocked**, chrome visible. That combination is deliberate: locked
+means click-through with the header hidden, and an undecorated transparent
+window is also absent from the taskbar and from Alt-Tab — so a locked first
+open is a panel with no visible controls and no way to find it. The user locks
+it once they can see where they put it.
+
+For the same reason the panel is drawn opaque enough to read on its own
+(`bg-black/75`, a light border, and bar tracks lighter than the panel rather
+than darker). With no daemon connected there is no data to draw, so the panel
+itself has to be the thing you see.
+
+Release builds log to the OS log dir (`%LOCALAPPDATA%\com.scryeq.web\logs` on
+Windows, `~/.local/share/com.scryeq.web/logs` on Linux) and record the
+overlay's position, size and scale at open — a packaged app has no console, and
+this is a window whose failure mode is being invisible.
 
 ## Known limits
 
