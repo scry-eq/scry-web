@@ -6,6 +6,7 @@ import {
   createSortedRowModel,
   flexRender,
   rowSortingFeature,
+  sortFns,
   tableFeatures,
   useTable,
   type ColumnSizingState,
@@ -33,6 +34,9 @@ const features = tableFeatures({
   columnSizingFeature,
   columnResizingFeature,
   sortedRowModel: createSortedRowModel(),
+  // Stock sort fns, so the auto-detected 'text'/'basic' names resolve;
+  // unregistered, v9 falls back to a case-sensitive codepoint compare.
+  sortFns,
   // Type-only slot: scopes `options.meta` to this table instead of augmenting
   // the library's global TableMeta interface.
   tableMeta: {} as SpawnTableMeta,

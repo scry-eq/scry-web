@@ -5,6 +5,7 @@ import {
   createSortedRowModel,
   flexRender,
   rowSortingFeature,
+  sortFns,
   tableFeatures,
   useTable,
   type SortingState,
@@ -28,6 +29,9 @@ const features = tableFeatures({
   rowSortingFeature,
   columnSizingFeature,
   sortedRowModel: createSortedRowModel(),
+  // Stock sort fns, so the auto-detected 'text'/'basic' names resolve;
+  // unregistered, v9 falls back to a case-sensitive codepoint compare.
+  sortFns,
 });
 
 const col = createColumnHelper<typeof features, LootRecord>();
