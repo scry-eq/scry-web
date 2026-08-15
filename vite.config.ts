@@ -22,6 +22,14 @@ export default defineConfig({
   },
   build: {
     chunkSizeWarningLimit: 700,
+    rollupOptions: {
+      // Two pages: the app, and the transparent overlay window Tauri opens as its own
+      // WebviewWindow. Both are served by the same dev server in `tauri dev`.
+      input: {
+        main: resolve(__dirname, 'index.html'),
+        overlay: resolve(__dirname, 'overlay.html'),
+      },
+    },
   },
   test: {
     // happy-dom is enough for store + localStorage tests; we don't

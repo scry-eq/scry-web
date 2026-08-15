@@ -21,7 +21,8 @@
     ],
     "security": {
       "csp": "default-src 'self' tauri: asset: https://asset.localhost; connect-src 'self' ws: wss:; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline'"
-    }
+    },
+    "macOSPrivateApi": true
   },
   "bundle": {
     "active": true,

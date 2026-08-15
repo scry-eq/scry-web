@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en" data-mode="dark" data-theme="default">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Bland like the main window's; the real title is set from Rust at build time. -->
+    <title>Notes</title>
+    <style>
+      /* index.css paints html/body with var(--background). A transparent window has no
+         native backdrop, so anything opaque here becomes a rectangle over the game — the
+         panel's own rgba is the only thing that may draw. */
+      html,
+      body,
+      #overlay-root {
+        height: 100%;
+        margin: 0;
+        background: transparent !important;
+        overflow: hidden;
+      }
+      /* Nothing in this window is text the user selects, and a stray drag-select during a
+         fight looks like a broken overlay. */
+      body {
+        user-select: none;
+        cursor: default;
+      }
+    </style>
+  </head>
+  <body>
+    <div id="overlay-root"></div>
+    <script type="module" src="/src/overlay/main.tsx"></script>
+  </body>
+</html>
