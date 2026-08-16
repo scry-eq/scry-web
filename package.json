@@ -15,7 +15,8 @@
     "test:e2e": "playwright test",
     "electron:dev": "electron-vite dev",
     "electron:build": "electron-vite build",
-    "electron:dist": "electron-vite build && electron-builder"
+    "electron:dist": "electron-vite build && electron-builder",
+    "electron:start": "electron ."
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.14.0",
