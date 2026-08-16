@@ -15,8 +15,16 @@ The map overlay opens its own `SeqClient` and `SpawnStore` (`src/overlay/session
 rather than borrowing the main window's: an overlay has to keep working when the main
 window is closed, and the daemon fans out to every subscriber anyway. `MapCanvas` takes
 `compact`, which starts the view controls and info box collapsed — they cost half the
-window at overlay sizes — and scopes their collapse state to separate storage keys so
+window at overlay sizes — and scopes their chrome state to separate storage keys so
 folding them there does not fold the main window's map.
+
+`compact` also makes the map's own background **translucent** (default 72%, adjustable
+with the Fade slider in its view controls). A docked panel wants an opaque backdrop; a
+window floating over the game wants to be seen through, and the canvas was previously
+filling opaque `#0a0e12` over an opaque wrapper — so the panel's translucency showed on
+the title bar and nowhere else. Note the paint clears before filling: an alpha fill drawn
+over the previous frame accumulates until the background is solid again, carrying the
+ghost of every earlier frame with it.
 
 - `electron/main/overlay.ts` — the windows and their click-through policy.
 - `electron/preload/overlay.ts` — their bridge, deliberately smaller than the main
