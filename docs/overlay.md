@@ -120,6 +120,19 @@ this was ported from found by hand and had to fix:
 
 Both have regression tests.
 
+## Map layer visibility
+
+Which layers are OFF is persisted (`map.hiddenLayers`) and re-applied whenever the
+geometry changes. The geometry effect otherwise turns every layer back on for each new
+map, which resets the choice on every zone.
+
+The stored set is the HIDDEN one, not the visible one, and that is the whole design: a
+layer the user has never seen — a new zone with a layer 3 — still defaults to visible,
+while "always turn 2 off" survives every zone load. Storing the visible set instead
+would hide anything new by default. It is also NOT scoped to the overlay/docked split
+like the chrome state, because it is a statement about the maps themselves rather than
+about one window's furniture.
+
 ## Known limits
 
 - **Fullscreen-exclusive defeats any of this**, on every platform. The game must run
