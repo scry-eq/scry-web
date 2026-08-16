@@ -1,4 +1,4 @@
-import { app, BrowserWindow, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, Menu, ipcMain, shell } from 'electron';
 import { join } from 'node:path';
 import {
   FORWARDS_MOUSE,
@@ -68,12 +68,30 @@ function createMainWindow(): BrowserWindow {
   return w;
 }
 
+/** Resolve on `event`, or after `ms` — never leaves the caller waiting on a window. */
+function once(w: BrowserWindow, event: 'show', ms: number): Promise<void> {
+  return new Promise((resolve) => {
+    const done = (): void => {
+      clearTimeout(timer);
+      w.removeListener(event, done);
+      resolve();
+    };
+    const timer = setTimeout(done, ms);
+    w.once(event, done);
+  });
+}
+
 function registerIpc(): void {
   ipcMain.handle('daemon:urlOverride', () => daemonUrlOverride());
 
-  ipcMain.handle('overlay:open', () => {
+  ipcMain.handle('overlay:open', async () => {
     const w = createOverlayWindow(blandTitle());
     if (!w.webContents.getURL()) loadPage(w, 'overlay');
+    // The window is `show: false` until 'ready-to-show', so asking now would report NOT
+    // visible for a window that is about to appear — and the caller turns that into an
+    // error. Wait for the real answer, with a ceiling so a window that never paints
+    // reports rather than hangs.
+    if (!w.isVisible()) await once(w, 'show', 5000);
     return overlayStatus();
   });
   ipcMain.handle('overlay:close', () => {
@@ -94,6 +112,10 @@ function registerIpc(): void {
 }
 
 app.whenReady().then(() => {
+  // No application menu. Every accelerator it provided (reload, devtools, zoom) is either
+  // unwanted in a game overlay companion or already reachable, and the strip is one more
+  // row of chrome on a window whose whole job is to show dense data.
+  Menu.setApplicationMenu(null);
   registerIpc();
   createMainWindow();
   app.on('activate', () => {

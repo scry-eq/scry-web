@@ -30,9 +30,11 @@ export function OverlayToggle() {
     try {
       const s = await api.overlay.open();
       if (!s?.exists) { toast.error('Overlay: no window was created.'); return; }
-      const msg = `Overlay ${s.visible ? 'visible' : 'NOT visible'} — ${s.w}x${s.h} at ${s.x},${s.y} @${s.scale}x. Screens: ${s.displays.join(' ')}`;
-      if (s.visible) toast.success(msg, { duration: 15000 });
-      else toast.error(msg, { duration: 30000 });
+      const msg = `Overlay ${s.w}x${s.h} at ${s.x},${s.y} @${s.scale}x. Screens: ${s.displays.join(' ')}`;
+      // Only "the window exists but the OS says it is not on screen" is a failure worth
+      // shouting about; the position readout is there either way.
+      if (s.visible) toast.success(msg, { duration: 6000 });
+      else toast.error(`NOT visible — ${msg}`, { duration: 30000 });
     } catch (err) {
       toast.error(`Overlay failed to open: ${String(err)}`);
     }
