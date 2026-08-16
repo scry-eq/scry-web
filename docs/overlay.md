@@ -120,6 +120,22 @@ this was ported from found by hand and had to fix:
 
 Both have regression tests.
 
+## Preferences across windows
+
+Each window is its own page with its own in-memory copy of the zustand stores, backed by
+one shared localStorage entry — so a preference changed in the main window never reached
+an overlay, which kept whatever was stored the moment it opened. That is why "follow
+player" and the select-on-target toggles looked ignored there.
+
+`state/prefsSync.ts` closes it: the `storage` event is the fast path, and a 1s poll of the
+same keys is the one that always works — the guarantee that `storage` fires for other
+same-origin documents is worth less under the `file://` origin a packaged build loads
+from, and reading one string a second costs nothing next to being silently out of sync.
+
+Selection driven by /consider and target packets is shared too
+(`state/selectFromPackets.ts`), rather than living in App: it is the same map, and a view
+that ignored those toggles would be a different app, not a second view of this one.
+
 ## Map layer visibility
 
 Which layers are OFF is persisted (`map.hiddenLayers`) and re-applied whenever the

@@ -19,6 +19,7 @@ import {
 import { ChatColorsPanel } from './ChatColorsPanel';
 import { SeqClient } from '../net/client';
 import { DEFAULT_URL, URL_STORAGE_KEY, daemonUrlOverride } from '../net/daemonUrl';
+import { selectFromPacket } from '../state/selectFromPackets';
 import { SpawnStore } from '../state/store';
 import { OverlayToggle } from './OverlayToggle';
 import { BoxPicker } from './BoxPicker';
@@ -412,24 +413,8 @@ export function App() {
     const detachEnv = client.onEnvelope((env) => store.apply(env));
     // Drive UI selection from /consider and target packets when the
     // user opted in via PreferencesPanel.
-    const detachSelect = client.onEnvelope((env) => {
-      const p = env.payload;
-      // Mirrors showeq-c interface.cpp:5035-5061: deselect-on-untarget
-      // runs independently of select-on-target — clearing the target
-      // can drop the current selection even with select-on-target off.
-      // Read the store directly inside the closure so the latest toggle
-      // value is used without re-subscribing on each change.
-      const prefs = usePrefsStore.getState();
-      if (p.case === 'considered' && p.value.spawnId && prefs.selectOnConsider) {
-        onSelect(p.value.spawnId);
-      } else if (p.case === 'targeted') {
-        if (p.value.spawnId === 0) {
-          if (prefs.deselectOnUntarget) onSelect(null);
-        } else if (prefs.selectOnTarget) {
-          onSelect(p.value.spawnId);
-        }
-      }
-    });
+    // Shared with the map overlay so both views honour the same toggles.
+    const detachSelect = client.onEnvelope((env) => selectFromPacket(env, onSelect));
     // Filter-flag-driven spawn alert sounds. `spawnAdded` is incremental
     // — the initial Snapshot's spawns don't pass through here, so a
     // fresh connect doesn't fire 200 cues at once. Snapshots after a

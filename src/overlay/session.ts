@@ -14,6 +14,11 @@ export type Session = {
   client: SeqClient | null;
   /** Bumped on a timer; the canvas and panels re-read the store off it. */
   tick: number;
+  /** The socket's real state, not "did we construct a client" — those differ for as long
+   *  as a connection is failing, which is exactly when the answer matters. */
+  status: 'open' | 'connecting' | 'closed';
+  /** What the store currently holds, so a window can say whether it is receiving. */
+  spawns: number;
 };
 
 export function useSession(): Session {
@@ -21,6 +26,7 @@ export function useSession(): Session {
   if (!storeRef.current) storeRef.current = new SpawnStore();
   const [client, setClient] = useState<SeqClient | null>(null);
   const [tick, setTick] = useState(0);
+  const [status, setStatus] = useState<Session['status']>('connecting');
 
   useEffect(() => {
     const store = storeRef.current!;
@@ -30,7 +36,10 @@ export function useSession(): Session {
     setClient(c);
     // 1 Hz, matching the main window: the store mutates continuously, and this is what
     // turns it into renders.
-    const id = setInterval(() => setTick((t) => t + 1), 1000);
+    const id = setInterval(() => {
+      setTick((t) => t + 1);
+      setStatus(c.state());
+    }, 1000);
     return () => {
       clearInterval(id);
       detach();
@@ -39,5 +48,5 @@ export function useSession(): Session {
     };
   }, []);
 
-  return { store: storeRef.current, client, tick };
+  return { store: storeRef.current, client, tick, status, spawns: storeRef.current.all().length };
 }

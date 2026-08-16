@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { Lock, LockOpen, X } from 'lucide-react';
-import { KIND_LABEL, overlay } from './bridge';
+import { overlay } from './bridge';
 import { useDaemon } from './useDaemon';
 import { useSession } from './session';
 import { MapOverlay } from './MapOverlay';
@@ -105,11 +105,13 @@ export function Overlay() {
       >
         <span
           className={`h-2 w-2 shrink-0 rounded-full ${
-            kind === 'map' ? (session.client ? 'bg-emerald-400' : 'bg-amber-400') : DOT[vitals.status]
+            DOT[kind === 'map' ? session.status : vitals.status]
           }`}
         />
         <span className="min-w-0 flex-1 truncate text-[11px] opacity-70">
-          {kind === 'map' ? KIND_LABEL[kind] : vitals.zone || 'no zone'}
+          {kind === 'map'
+            ? `${session.store.zoneLongName() || session.store.zone() || 'no zone'} · ${session.spawns}`
+            : vitals.zone || 'no zone'}
         </span>
         <button
           type="button"
