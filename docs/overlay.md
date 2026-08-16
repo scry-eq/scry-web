@@ -18,8 +18,11 @@ window is closed, and the daemon fans out to every subscriber anyway. `MapCanvas
 window at overlay sizes — and scopes their chrome state to separate storage keys so
 folding them there does not fold the main window's map.
 
-`compact` also makes the map's own background **translucent** (default 72%, adjustable
-with the Fade slider in its view controls). A docked panel wants an opaque backdrop; a
+`compact` also makes the map's own background **translucent** (default 35%, adjustable
+from 0 with the Fade slider in its view controls). The overlay SHELL paints no background
+for the map either — it does for the text panels, which need it to read — because a fixed
+layer of black under the canvas is darkness the Fade slider cannot give back, and with it
+in place fading the canvas to 5% still looked nearly solid. A docked panel wants an opaque backdrop; a
 window floating over the game wants to be seen through, and the canvas was previously
 filling opaque `#0a0e12` over an opaque wrapper — so the panel's translucency showed on
 the title bar and nowhere else. Note the paint clears before filling: an alpha fill drawn

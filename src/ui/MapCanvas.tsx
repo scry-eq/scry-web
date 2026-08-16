@@ -355,8 +355,11 @@ export function MapCanvas({
   // How solid the map's own background is. A docked panel is opaque; floating over the game
   // the point is to see through it, so `compact` starts translucent and the user can tune it.
   const [bgAlpha, setBgAlpha] = useState<number>(() => {
-    const v = Number(localStorage.getItem(chromeKey('bgAlpha')));
-    return Number.isFinite(v) && v > 0 ? Math.min(1, v) : compact ? 0.72 : 1;
+    // Fully clear is a legitimate choice now that the shell adds nothing of its own, so the
+    // guard is >= 0 — treating a saved 0 as "missing" would snap it back to the default.
+    const raw = localStorage.getItem(chromeKey('bgAlpha'));
+    const v = raw === null ? NaN : Number(raw);
+    return Number.isFinite(v) && v >= 0 && v <= 1 ? v : compact ? 0.35 : 1;
   });
   const bgAlphaRef = useRef(bgAlpha);
   useEffect(() => {
@@ -1362,7 +1365,7 @@ export function MapCanvas({
             <span className="w-7 shrink-0">Fade</span>
             <input
               type="range"
-              min={5}
+              min={0}
               max={100}
               step={5}
               value={Math.round(bgAlpha * 100)}
