@@ -1,0 +1,61 @@
+// Small on-disk settings for the shell. Deliberately not a dependency: this is one JSON
+// file with one key, and a store library would be more surface than the thing it stores.
+
+import { app } from 'electron';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+
+export type Bounds = { x: number; y: number; width: number; height: number };
+
+const file = (): string => join(app.getPath('userData'), 'shell.json');
+
+type Shape = { overlayBounds?: Bounds };
+
+function read(): Shape {
+  try {
+    return JSON.parse(readFileSync(file(), 'utf8')) as Shape;
+  } catch {
+    // Absent on first run, and unreadable/corrupt is the same answer: use defaults rather
+    // than fail to start over a settings file.
+    return {};
+  }
+}
+
+let pending: ReturnType<typeof setTimeout> | undefined;
+
+function write(next: Shape): void {
+  try {
+    mkdirSync(dirname(file()), { recursive: true });
+    writeFileSync(file(), JSON.stringify(next, null, 2));
+  } catch {
+    // A window position is not worth surfacing an error for.
+  }
+}
+
+export function readOverlayBounds(): Bounds | null {
+  const b = read().overlayBounds;
+  if (!b) return null;
+  const ok = [b.x, b.y, b.width, b.height].every((n) => typeof n === 'number' && Number.isFinite(n));
+  return ok ? b : null;
+}
+
+/**
+ * Debounced: 'moved' and 'resized' fire continuously through a drag, and this is a
+ * settings file, not a telemetry stream. `flushOverlayBounds` covers the case where the
+ * window closes inside the debounce window.
+ */
+export function saveOverlayBounds(b: Bounds): void {
+  if (pending) clearTimeout(pending);
+  pending = setTimeout(() => {
+    pending = undefined;
+    write({ ...read(), overlayBounds: b });
+  }, 400);
+}
+
+export function flushOverlayBounds(b: Bounds): void {
+  if (pending) {
+    clearTimeout(pending);
+    pending = undefined;
+  }
+  write({ ...read(), overlayBounds: b });
+}

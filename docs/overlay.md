@@ -23,6 +23,19 @@ therefore stays visible when locked on those platforms (`FORWARDS_MOUSE`), becau
 locked overlay with hidden chrome, no taskbar button and no Alt-Tab entry is one the
 user cannot get back.
 
+## Placement
+
+The window reopens where the user last left it — `moved`/`resized` persist to
+`shell.json` in the user data dir, debounced, with a flush on close so a drag that
+ends in closing the window is not lost. Only those events are hooked, so nothing
+records a position the app chose for itself.
+
+A saved rectangle is used **only if it still lands on a display that exists now**.
+Monitors get unplugged and resolutions change; restoring blindly then puts the
+overlay somewhere unreachable, and it has no taskbar button or Alt-Tab entry to
+recover it with. "Usable" means enough of the header to grab (120x28) overlaps some
+display's work area — not a single pixel. Otherwise it falls back to centered.
+
 ## First open
 
 Centered on the display under the cursor, **unlocked**, chrome visible. Locked is the
@@ -56,7 +69,6 @@ Both of these fail *silently* — no error, just no bridge and no window:
 
 - **No drag snapping.** The header is a `-webkit-app-region: drag` region, so the OS
   runs the drag. Magnetic snapping would mean a `will-move` handler.
-- **Bounds are not persisted** across sessions yet.
 - **Fullscreen-exclusive defeats any of this**, on every platform. The game must run
   windowed or borderless.
 - A driver that cannot composite a transparent frameless window renders it as a black

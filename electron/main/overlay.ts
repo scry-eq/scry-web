@@ -9,6 +9,7 @@
 
 import { BrowserWindow, screen, shell } from 'electron';
 import { join } from 'node:path';
+import { flushOverlayBounds, readOverlayBounds, saveOverlayBounds, type Bounds } from './store';
 
 export const OVERLAY_LABEL = 'overlay';
 
@@ -82,6 +83,42 @@ export function overlayStatus(): Record<string, unknown> {
   };
 }
 
+function centered(): Bounds {
+  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  return {
+    x: Math.round(area.x + (area.width - DEFAULT_SIZE.width) / 2),
+    y: Math.round(area.y + (area.height - DEFAULT_SIZE.height) / 2),
+    ...DEFAULT_SIZE,
+  };
+}
+
+/**
+ * A saved rectangle is only usable if it still lands on a display that EXISTS NOW. Monitors
+ * get unplugged, resolutions change, and a laptop that docked at three screens opens at one
+ * — restoring blindly then puts the overlay somewhere the user cannot see or reach, and it
+ * has no taskbar button or Alt-Tab entry to recover it with.
+ *
+ * "Usable" means a meaningful corner is visible, not a single pixel: enough of the header to
+ * grab, on some display's work area.
+ */
+function onScreen(b: Bounds | null): Bounds | null {
+  if (!b) return null;
+  const NEEDED = { w: 120, h: 28 };
+  const visible = screen.getAllDisplays().some((d) => {
+    const a = d.workArea;
+    const overlapW = Math.min(b.x + b.width, a.x + a.width) - Math.max(b.x, a.x);
+    const overlapH = Math.min(b.y + b.height, a.y + a.height) - Math.max(b.y, a.y);
+    return overlapW >= NEEDED.w && overlapH >= NEEDED.h;
+  });
+  if (!visible) return null;
+  // Never restore below the floor the window can render at.
+  return {
+    ...b,
+    width: Math.max(b.width, MIN_SIZE.width),
+    height: Math.max(b.height, MIN_SIZE.height),
+  };
+}
+
 export function createOverlayWindow(title: string): BrowserWindow {
   const existing = getOverlayWindow();
   if (existing) {
@@ -89,11 +126,9 @@ export function createOverlayWindow(title: string): BrowserWindow {
     return existing;
   }
 
-  // Centered on the display the cursor is on, so it opens where the user is looking rather
-  // than at whatever corner the OS would pick.
-  const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
-  const x = Math.round(area.x + (area.width - DEFAULT_SIZE.width) / 2);
-  const y = Math.round(area.y + (area.height - DEFAULT_SIZE.height) / 2);
+  // Where the user last left it, if that is still somewhere they can see. Otherwise
+  // centered on the display the cursor is on, rather than whatever corner the OS picks.
+  const { x, y, width, height } = onScreen(readOverlayBounds()) ?? centered();
 
   // UNLOCKED to start. Locked means click-through with the chrome hidden — a panel with no
   // visible controls that is also absent from the taskbar and Alt-Tab, i.e. one the user
@@ -103,7 +138,8 @@ export function createOverlayWindow(title: string): BrowserWindow {
   const w = new BrowserWindow({
     x,
     y,
-    ...DEFAULT_SIZE,
+    width,
+    height,
     minWidth: MIN_SIZE.width,
     minHeight: MIN_SIZE.height,
     show: false,
@@ -137,6 +173,19 @@ export function createOverlayWindow(title: string): BrowserWindow {
     w.showInactive();
     w.setAlwaysOnTop(true, 'screen-saver');
     setOverlayLocked(locked);
+  });
+
+  // Persist the user's own placement. 'moved'/'resized' only fire for a real move, so
+  // nothing here records a position the app chose for itself.
+  const remember = (): void => {
+    if (!w.isDestroyed()) saveOverlayBounds(w.getBounds());
+  };
+  w.on('moved', remember);
+  w.on('resized', remember);
+  // 'close' still has a live window; 'closed' does not, and a drag that ends by closing the
+  // window would otherwise be lost inside the debounce.
+  w.on('close', () => {
+    if (!w.isDestroyed()) flushOverlayBounds(w.getBounds());
   });
 
   w.on('closed', () => {
