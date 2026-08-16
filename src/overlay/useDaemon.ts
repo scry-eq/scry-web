@@ -27,11 +27,13 @@ const EMPTY: Vitals = {
   manaMax: 0,
 };
 
-export function useDaemon(): Vitals {
+export function useDaemon(enabled = true): Vitals {
   const [vitals, setVitals] = useState<Vitals>(EMPTY);
   const spawns = useRef(new Set<number>());
 
   useEffect(() => {
+    // A window that draws no vitals opens no second socket for them.
+    if (!enabled) return;
     const client = new SeqClient(daemonUrl());
     const detach = client.onEnvelope((env) => {
       const p = env.payload;
@@ -86,7 +88,7 @@ export function useDaemon(): Vitals {
       detach();
       client.close();
     };
-  }, []);
+  }, [enabled]);
 
   return vitals;
 }

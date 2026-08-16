@@ -4,12 +4,13 @@
 import { app } from 'electron';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
+import type { OverlayKind } from './kinds';
 
 export type Bounds = { x: number; y: number; width: number; height: number };
 
 const file = (): string => join(app.getPath('userData'), 'shell.json');
 
-type Shape = { overlayBounds?: Bounds };
+type Shape = { overlayBounds?: Partial<Record<OverlayKind, Bounds>> };
 
 function read(): Shape {
   try {
@@ -32,11 +33,16 @@ function write(next: Shape): void {
   }
 }
 
-export function readOverlayBounds(): Bounds | null {
-  const b = read().overlayBounds;
+export function readOverlayBounds(kind: OverlayKind): Bounds | null {
+  const b = read().overlayBounds?.[kind];
   if (!b) return null;
   const ok = [b.x, b.y, b.width, b.height].every((n) => typeof n === 'number' && Number.isFinite(n));
   return ok ? b : null;
+}
+
+function put(kind: OverlayKind, b: Bounds): void {
+  const cur = read();
+  write({ ...cur, overlayBounds: { ...cur.overlayBounds, [kind]: b } });
 }
 
 /**
@@ -44,18 +50,18 @@ export function readOverlayBounds(): Bounds | null {
  * settings file, not a telemetry stream. `flushOverlayBounds` covers the case where the
  * window closes inside the debounce window.
  */
-export function saveOverlayBounds(b: Bounds): void {
+export function saveOverlayBounds(kind: OverlayKind, b: Bounds): void {
   if (pending) clearTimeout(pending);
   pending = setTimeout(() => {
     pending = undefined;
-    write({ ...read(), overlayBounds: b });
+    put(kind, b);
   }, 400);
 }
 
-export function flushOverlayBounds(b: Bounds): void {
+export function flushOverlayBounds(kind: OverlayKind, b: Bounds): void {
   if (pending) {
     clearTimeout(pending);
     pending = undefined;
   }
-  write({ ...read(), overlayBounds: b });
+  put(kind, b);
 }

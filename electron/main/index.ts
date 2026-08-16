@@ -9,6 +9,7 @@ import {
   setOverlayIgnoreMouse,
   setOverlayLocked,
 } from './overlay';
+import { OVERLAY_KINDS, isOverlayKind, type OverlayKind } from './kinds';
 
 // Bland, generic window titles so the app blends in on the desktop and nothing in the title
 // bar pattern-matches the project name, in case another process enumerates window titles.
@@ -39,10 +40,12 @@ function daemonUrlOverride(): string | null {
 }
 
 /** Dev serves from vite; a packaged build loads the file electron-vite emitted. */
-function loadPage(w: BrowserWindow, page: 'index' | 'overlay'): void {
+function loadPage(w: BrowserWindow, page: 'index' | 'overlay', kind?: OverlayKind): void {
   const devServer = process.env.ELECTRON_RENDERER_URL;
-  if (devServer) void w.loadURL(`${devServer}/${page}.html`);
-  else void w.loadFile(join(__dirname, `../renderer/${page}.html`));
+  // One overlay.html serves every kind; it reads `?kind=` to decide what to draw.
+  const query = kind ? `?kind=${kind}` : '';
+  if (devServer) void w.loadURL(`${devServer}/${page}.html${query}`);
+  else void w.loadFile(join(__dirname, `../renderer/${page}.html`), { search: query.slice(1) });
 }
 
 function createMainWindow(): BrowserWindow {
@@ -84,30 +87,39 @@ function once(w: BrowserWindow, event: 'show', ms: number): Promise<void> {
 function registerIpc(): void {
   ipcMain.handle('daemon:urlOverride', () => daemonUrlOverride());
 
-  ipcMain.handle('overlay:open', async () => {
-    const w = createOverlayWindow(blandTitle());
-    if (!w.webContents.getURL()) loadPage(w, 'overlay');
+  // Every overlay call is kind-scoped. An unknown kind falls back to 'vitals' rather than
+  // throwing: a bad query string must not be able to take a window down.
+  const asKind = (v: unknown): OverlayKind => (isOverlayKind(v) ? v : 'vitals');
+
+  ipcMain.handle('overlay:kinds', () => OVERLAY_KINDS);
+
+  ipcMain.handle('overlay:open', async (_e, k: unknown) => {
+    const kind = asKind(k);
+    const w = createOverlayWindow(kind, blandTitle());
+    if (!w.webContents.getURL()) loadPage(w, 'overlay', kind);
     // The window is `show: false` until 'ready-to-show', so asking now would report NOT
     // visible for a window that is about to appear — and the caller turns that into an
     // error. Wait for the real answer, with a ceiling so a window that never paints
     // reports rather than hangs.
     if (!w.isVisible()) await once(w, 'show', 5000);
-    return overlayStatus();
+    return overlayStatus(kind);
   });
-  ipcMain.handle('overlay:close', () => {
-    getOverlayWindow()?.close();
+  ipcMain.handle('overlay:close', (_e, k: unknown) => {
+    getOverlayWindow(asKind(k))?.close();
   });
-  ipcMain.handle('overlay:status', () => overlayStatus());
-  ipcMain.handle('overlay:locked', () => isOverlayLocked());
+  ipcMain.handle('overlay:status', (_e, k: unknown) => overlayStatus(asKind(k)));
+  ipcMain.handle('overlay:statusAll', () => OVERLAY_KINDS.map((k) => overlayStatus(k)));
+  ipcMain.handle('overlay:locked', (_e, k: unknown) => isOverlayLocked(asKind(k)));
   ipcMain.handle('overlay:forwardsMouse', () => FORWARDS_MOUSE);
-  ipcMain.handle('overlay:setLocked', (_e, next: boolean) => {
-    setOverlayLocked(Boolean(next));
+  ipcMain.handle('overlay:setLocked', (_e, k: unknown, next: boolean) => {
+    setOverlayLocked(asKind(k), Boolean(next));
   });
   // The overlay's own hover handling drives this: `forward: true` means the window still
   // sees mouse-moves while click-through, so the renderer knows when the pointer is over
   // something clickable and asks for capture back.
-  ipcMain.handle('overlay:setIgnoreMouse', (_e, ignore: boolean) => {
-    if (isOverlayLocked()) setOverlayIgnoreMouse(Boolean(ignore));
+  ipcMain.handle('overlay:setIgnoreMouse', (_e, k: unknown, ignore: boolean) => {
+    const kind = asKind(k);
+    if (isOverlayLocked(kind)) setOverlayIgnoreMouse(kind, Boolean(ignore));
   });
 }
 

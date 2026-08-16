@@ -1,12 +1,26 @@
-# The game overlay window
+# The game overlay windows
 
-A second `BrowserWindow` that floats over the running game: transparent, frameless,
-always-on-top, click-through. Desktop only — `OverlayToggle` renders nothing in a
-browser, because there is no web fallback for an always-on-top OS window.
+Transparent, frameless, always-on-top, click-through `BrowserWindow`s that float over
+the running game. Desktop only — `OverlayToggle` renders nothing in a browser, because
+there is no web fallback for an always-on-top OS window.
 
-- `electron/main/overlay.ts` — the window and its click-through policy.
-- `electron/preload/overlay.ts` — its bridge, deliberately smaller than the main
-  window's.
+**Kinds** (`electron/main/kinds.ts`): `vitals` — a small strip of zone, HP, mana, level
+and spawn count; `map` — the full `MapCanvas`. Any combination can be open at once, each
+its own window with its own remembered bounds. One `overlay.html` serves them all: the
+window is loaded with `?kind=`, the preload reads it and threads it into every IPC call,
+so a renderer can only ever address its own window. An unknown kind falls back to
+`vitals` rather than throwing — a bad query string must not be able to take a window down.
+
+The map overlay opens its own `SeqClient` and `SpawnStore` (`src/overlay/session.ts`)
+rather than borrowing the main window's: an overlay has to keep working when the main
+window is closed, and the daemon fans out to every subscriber anyway. `MapCanvas` takes
+`compact`, which starts the view controls and info box collapsed — they cost half the
+window at overlay sizes — and scopes their collapse state to separate storage keys so
+folding them there does not fold the main window's map.
+
+- `electron/main/overlay.ts` — the windows and their click-through policy.
+- `electron/preload/overlay.ts` — their bridge, deliberately smaller than the main
+  window's, and kind-scoped.
 - `src/overlay/` — the page it loads. `overlay.html` is a second Vite entry, shared
   by the web build and the shell.
 

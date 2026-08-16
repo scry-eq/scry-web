@@ -1,17 +1,16 @@
-// The floating game overlay: one transparent, frameless, always-on-top window that sits over
-// the client. Electron gives this natively — transparent + frameless + always-on-top at the
-// screen-saver level + setIgnoreMouseEvents(forward) — so there is no cursor sampling and no
-// per-platform hit-testing here.
+// The floating game overlays: transparent, frameless, always-on-top windows that sit over
+// the client. One per kind, any combination open at once.
 //
-// `forward: true` is the whole reason this file is short. It keeps the window receiving
-// mouse-MOVES while clicks pass through to the game, so the renderer's own hover handling is
-// what re-enables capture over the header. Nothing has to guess where the pointer is.
+// Electron gives this natively — transparent + frameless + always-on-top at the screen-saver
+// level + setIgnoreMouseEvents(forward) — so there is no cursor sampling and no per-platform
+// hit-testing. `forward: true` is why: it keeps the window receiving mouse-MOVES while clicks
+// pass through to the game, so the renderer's own hover handling re-enables capture over the
+// header and nothing has to guess where the pointer is.
 
 import { BrowserWindow, screen, shell } from 'electron';
 import { join } from 'node:path';
+import { DEFAULT_SIZE, MIN_SIZE, OVERLAY_KINDS, type OverlayKind } from './kinds';
 import { flushOverlayBounds, readOverlayBounds, saveOverlayBounds, type Bounds } from './store';
-
-export const OVERLAY_LABEL = 'overlay';
 
 /**
  * Can a click-through window still receive mouse-MOVES? `setIgnoreMouseEvents`'s `forward`
@@ -21,20 +20,26 @@ export const OVERLAY_LABEL = 'overlay';
  */
 export const FORWARDS_MOUSE = process.platform === 'win32' || process.platform === 'darwin';
 
-const DEFAULT_SIZE = { width: 340, height: 200 };
-const MIN_SIZE = { width: 180, height: 90 };
-
-let overlayWindow: BrowserWindow | null = null;
+const windows = new Map<OverlayKind, BrowserWindow>();
 /** Locked = click-through over the game. Unlocked = an ordinary window you can place. */
-let locked = false;
+const lockState = new Map<OverlayKind, boolean>();
 
-export function getOverlayWindow(): BrowserWindow | null {
-  if (overlayWindow?.isDestroyed()) return null;
-  return overlayWindow;
+export function getOverlayWindow(kind: OverlayKind): BrowserWindow | null {
+  const w = windows.get(kind);
+  if (!w || w.isDestroyed()) return null;
+  return w;
 }
 
-export function isOverlayLocked(): boolean {
-  return locked;
+/** Every live overlay, for callers that need the whole population (snapping, teardown). */
+export function openOverlays(): { kind: OverlayKind; win: BrowserWindow }[] {
+  return OVERLAY_KINDS.flatMap((kind) => {
+    const win = getOverlayWindow(kind);
+    return win ? [{ kind, win }] : [];
+  });
+}
+
+export function isOverlayLocked(kind: OverlayKind): boolean {
+  return lockState.get(kind) ?? false;
 }
 
 /**
@@ -42,35 +47,36 @@ export function isOverlayLocked(): boolean {
  * hover both land here, because two call sites disagreeing about `forward` is a performance
  * bug nobody can see.
  */
-export function setOverlayIgnoreMouse(ignore: boolean): void {
-  const w = getOverlayWindow();
+export function setOverlayIgnoreMouse(kind: OverlayKind, ignore: boolean): void {
+  const w = getOverlayWindow(kind);
   if (!w) return;
   if (ignore) w.setIgnoreMouseEvents(true, { forward: FORWARDS_MOUSE });
   else w.setIgnoreMouseEvents(false);
 }
 
-export function setOverlayLocked(next: boolean): void {
-  locked = next;
-  const w = getOverlayWindow();
+export function setOverlayLocked(kind: OverlayKind, next: boolean): void {
+  lockState.set(kind, next);
+  const w = getOverlayWindow(kind);
   if (!w) return;
   // setFocusable moves the FOREGROUND window on Windows, so it is only touched when the
   // value actually changes — an overlay that re-asserts it on every update hands focus back
   // to whatever is underneath, which is the game.
   if (w.isFocusable() === next) w.setFocusable(!next);
-  setOverlayIgnoreMouse(next);
+  setOverlayIgnoreMouse(kind, next);
   w.webContents.send('overlay:lockedChanged', next);
 }
 
-/** Where the window is, as the OS reports it — reported into the UI, never inferred. */
-export function overlayStatus(): Record<string, unknown> {
-  const w = getOverlayWindow();
+/** Where a window is, as the OS reports it — reported into the UI, never inferred. */
+export function overlayStatus(kind: OverlayKind): Record<string, unknown> {
+  const w = getOverlayWindow(kind);
   const displays = screen.getAllDisplays().map((d) => {
     const b = d.bounds;
     return `${b.width}x${b.height}+${b.x}+${b.y}@${d.scaleFactor}`;
   });
-  if (!w) return { exists: false, visible: false, displays };
+  if (!w) return { kind, exists: false, visible: false, displays };
   const b = w.getBounds();
   return {
+    kind,
     exists: true,
     visible: w.isVisible(),
     x: b.x,
@@ -78,17 +84,18 @@ export function overlayStatus(): Record<string, unknown> {
     w: b.width,
     h: b.height,
     scale: screen.getDisplayMatching(b).scaleFactor,
-    locked,
+    locked: isOverlayLocked(kind),
     displays,
   };
 }
 
-function centered(): Bounds {
+function centered(kind: OverlayKind): Bounds {
   const area = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
+  const size = DEFAULT_SIZE[kind];
   return {
-    x: Math.round(area.x + (area.width - DEFAULT_SIZE.width) / 2),
-    y: Math.round(area.y + (area.height - DEFAULT_SIZE.height) / 2),
-    ...DEFAULT_SIZE,
+    x: Math.round(area.x + (area.width - size.width) / 2),
+    y: Math.round(area.y + (area.height - size.height) / 2),
+    ...size,
   };
 }
 
@@ -101,7 +108,7 @@ function centered(): Bounds {
  * "Usable" means a meaningful corner is visible, not a single pixel: enough of the header to
  * grab, on some display's work area.
  */
-function onScreen(b: Bounds | null): Bounds | null {
+function onScreen(kind: OverlayKind, b: Bounds | null): Bounds | null {
   if (!b) return null;
   const NEEDED = { w: 120, h: 28 };
   const visible = screen.getAllDisplays().some((d) => {
@@ -114,13 +121,13 @@ function onScreen(b: Bounds | null): Bounds | null {
   // Never restore below the floor the window can render at.
   return {
     ...b,
-    width: Math.max(b.width, MIN_SIZE.width),
-    height: Math.max(b.height, MIN_SIZE.height),
+    width: Math.max(b.width, MIN_SIZE[kind].width),
+    height: Math.max(b.height, MIN_SIZE[kind].height),
   };
 }
 
-export function createOverlayWindow(title: string): BrowserWindow {
-  const existing = getOverlayWindow();
+export function createOverlayWindow(kind: OverlayKind, title: string): BrowserWindow {
+  const existing = getOverlayWindow(kind);
   if (existing) {
     existing.show();
     return existing;
@@ -128,20 +135,20 @@ export function createOverlayWindow(title: string): BrowserWindow {
 
   // Where the user last left it, if that is still somewhere they can see. Otherwise
   // centered on the display the cursor is on, rather than whatever corner the OS picks.
-  const { x, y, width, height } = onScreen(readOverlayBounds()) ?? centered();
+  const { x, y, width, height } = onScreen(kind, readOverlayBounds(kind)) ?? centered(kind);
 
   // UNLOCKED to start. Locked means click-through with the chrome hidden — a panel with no
   // visible controls that is also absent from the taskbar and Alt-Tab, i.e. one the user
   // cannot find. It gets locked once they can see where they put it.
-  locked = false;
+  lockState.set(kind, false);
 
   const w = new BrowserWindow({
     x,
     y,
     width,
     height,
-    minWidth: MIN_SIZE.width,
-    minHeight: MIN_SIZE.height,
+    minWidth: MIN_SIZE[kind].width,
+    minHeight: MIN_SIZE[kind].height,
     show: false,
     frame: false,
     transparent: true,
@@ -163,36 +170,36 @@ export function createOverlayWindow(title: string): BrowserWindow {
       webSecurity: true,
     },
   });
-  overlayWindow = w;
+  windows.set(kind, w);
 
   // Above ordinary windows and above a borderless game.
   w.setAlwaysOnTop(true, 'screen-saver');
 
   w.once('ready-to-show', () => {
-    // showInactive so opening the overlay never pulls focus off the game.
+    // showInactive so opening an overlay never pulls focus off the game.
     w.showInactive();
     w.setAlwaysOnTop(true, 'screen-saver');
-    setOverlayLocked(locked);
+    setOverlayLocked(kind, isOverlayLocked(kind));
   });
 
   // Persist the user's own placement. 'moved'/'resized' only fire for a real move, so
   // nothing here records a position the app chose for itself.
   const remember = (): void => {
-    if (!w.isDestroyed()) saveOverlayBounds(w.getBounds());
+    if (!w.isDestroyed()) saveOverlayBounds(kind, w.getBounds());
   };
   w.on('moved', remember);
   w.on('resized', remember);
   // 'close' still has a live window; 'closed' does not, and a drag that ends by closing the
   // window would otherwise be lost inside the debounce.
   w.on('close', () => {
-    if (!w.isDestroyed()) flushOverlayBounds(w.getBounds());
+    if (!w.isDestroyed()) flushOverlayBounds(kind, w.getBounds());
   });
 
   w.on('closed', () => {
-    overlayWindow = null;
+    windows.delete(kind);
   });
 
-  // The overlay renders our page and nothing else; any link opens in the real browser.
+  // An overlay renders our page and nothing else; any link opens in the real browser.
   w.webContents.setWindowOpenHandler(({ url }) => {
     void shell.openExternal(url);
     return { action: 'deny' };

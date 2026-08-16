@@ -1,7 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
 import { Lock, LockOpen, X } from 'lucide-react';
-import { overlay } from './bridge';
+import { KIND_LABEL, overlay } from './bridge';
 import { useDaemon } from './useDaemon';
+import { useSession } from './session';
+import { MapOverlay } from './MapOverlay';
 
 const DOT: Record<string, string> = {
   open: 'bg-emerald-400',
@@ -27,8 +29,12 @@ function Bar({ label, cur, max, className }: {
 }
 
 export function Overlay() {
-  const vitals = useDaemon();
   const api = overlay();
+  const kind = api?.kind ?? 'vitals';
+  // The map needs the whole world, so that window opens a store-backed session; the vitals
+  // strip needs four numbers and keeps its cheaper client.
+  const session = useSession();
+  const vitals = useDaemon(kind === 'vitals');
   const [locked, setLocked] = useState(false);
   const [hover, setHover] = useState(!api);
   // Where the pointer cannot be seen through a click-through window, the chrome must stay
@@ -87,9 +93,13 @@ export function Overlay() {
           chrome ? 'border-white/10 bg-white/5 opacity-100' : 'border-transparent opacity-0'
         }`}
       >
-        <span className={`h-2 w-2 shrink-0 rounded-full ${DOT[vitals.status]}`} />
+        <span
+          className={`h-2 w-2 shrink-0 rounded-full ${
+            kind === 'map' ? (session.client ? 'bg-emerald-400' : 'bg-amber-400') : DOT[vitals.status]
+          }`}
+        />
         <span className="min-w-0 flex-1 truncate text-[11px] opacity-70">
-          {vitals.zone || 'no zone'}
+          {kind === 'map' ? KIND_LABEL[kind] : vitals.zone || 'no zone'}
         </span>
         <button
           type="button"
@@ -111,13 +121,19 @@ export function Overlay() {
         </button>
       </div>
 
-      <div className="flex min-h-0 flex-1 flex-col justify-center gap-2 px-2.5 py-2">
-        <Bar label="hp" cur={vitals.hpCur} max={vitals.hpMax} className="bg-red-500/80" />
-        <Bar label="mana" cur={vitals.manaCur} max={vitals.manaMax} className="bg-sky-500/80" />
-        <div className="flex items-baseline justify-between pt-0.5 text-[11px] opacity-70">
-          <span>lvl {vitals.level || '—'}</span>
-          <span className="font-mono tabular-nums">{vitals.spawns} spawns</span>
-        </div>
+      <div className="min-h-0 flex-1">
+        {kind === 'map' ? (
+          <MapOverlay session={session} />
+        ) : (
+          <div className="flex h-full flex-col justify-center gap-2 px-2.5 py-2">
+            <Bar label="hp" cur={vitals.hpCur} max={vitals.hpMax} className="bg-red-500/80" />
+            <Bar label="mana" cur={vitals.manaCur} max={vitals.manaMax} className="bg-sky-500/80" />
+            <div className="flex items-baseline justify-between pt-0.5 text-[11px] opacity-70">
+              <span>lvl {vitals.level || '—'}</span>
+              <span className="font-mono tabular-nums">{vitals.spawns} spawns</span>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

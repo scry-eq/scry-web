@@ -1,7 +1,16 @@
 // The desktop surface the overlay uses, and the no-op it degrades to in a plain browser —
 // `bun run dev` opens overlay.html as an ordinary page, and it must still render.
 
+export const OVERLAY_KINDS = ['vitals', 'map'] as const;
+export type OverlayKind = (typeof OVERLAY_KINDS)[number];
+
+export const KIND_LABEL: Record<OverlayKind, string> = {
+  vitals: 'Vitals',
+  map: 'Map',
+};
+
 export type Status = {
+  kind: OverlayKind;
   exists: boolean;
   visible: boolean;
   x?: number;
@@ -16,15 +25,17 @@ export type Status = {
 type MainApi = {
   daemonUrlOverride: () => Promise<string | null>;
   overlay: {
-    open: () => Promise<Status>;
-    close: () => Promise<void>;
-    status: () => Promise<Status>;
-    locked: () => Promise<boolean>;
-    setLocked: (v: boolean) => Promise<void>;
+    kinds: () => Promise<OverlayKind[]>;
+    open: (kind: OverlayKind) => Promise<Status>;
+    close: (kind: OverlayKind) => Promise<void>;
+    status: (kind: OverlayKind) => Promise<Status>;
+    statusAll: () => Promise<Status[]>;
   };
 };
 
 type OverlayApi = {
+  /** Which panel this window is, read from `?kind=` by the preload. */
+  kind: OverlayKind;
   close: () => Promise<void>;
   locked: () => Promise<boolean>;
   forwardsMouse: () => Promise<boolean>;

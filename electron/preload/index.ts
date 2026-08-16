@@ -5,10 +5,10 @@ import { contextBridge, ipcRenderer } from 'electron';
 contextBridge.exposeInMainWorld('scry', {
   daemonUrlOverride: (): Promise<string | null> => ipcRenderer.invoke('daemon:urlOverride'),
   overlay: {
-    open: (): Promise<unknown> => ipcRenderer.invoke('overlay:open'),
-    close: (): Promise<void> => ipcRenderer.invoke('overlay:close'),
-    status: (): Promise<unknown> => ipcRenderer.invoke('overlay:status'),
-    locked: (): Promise<boolean> => ipcRenderer.invoke('overlay:locked'),
-    setLocked: (v: boolean): Promise<void> => ipcRenderer.invoke('overlay:setLocked', v),
+    kinds: (): Promise<string[]> => ipcRenderer.invoke('overlay:kinds'),
+    open: (kind: string): Promise<unknown> => ipcRenderer.invoke('overlay:open', kind),
+    close: (kind: string): Promise<void> => ipcRenderer.invoke('overlay:close', kind),
+    status: (kind: string): Promise<unknown> => ipcRenderer.invoke('overlay:status', kind),
+    statusAll: (): Promise<unknown[]> => ipcRenderer.invoke('overlay:statusAll'),
   },
 });
