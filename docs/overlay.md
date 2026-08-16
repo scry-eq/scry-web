@@ -79,10 +79,38 @@ Both of these fail *silently* — no error, just no bridge and no window:
   startup. Externalizing it also stops rollup hoisting a shared chunk between the two
   preloads, which a sandboxed preload's `require` cannot resolve.
 
+## Drag snapping
+
+Dragging an overlay lines it up with the app's other windows and with the screen
+edges (`electron/main/snap.ts`, pure and unit-tested). It snaps to four positions per
+axis against another window — abut after, abut before, align near edges, align far
+edges — and to each display's **work area**, so a snapped window lands beside the
+taskbar rather than under it.
+
+`will-move` is the only seam: the header is an OS drag region, so the renderer never
+sees a mousemove and has nothing to correct. It is **Windows/macOS only** — on Linux
+the event never fires and a drag behaves exactly as it always has.
+
+Two things in here are not obvious, and both are defects the reference implementation
+this was ported from found by hand and had to fix:
+
+- **"Are these two windows a pair?" is not the snap distance.** They answer different
+  questions: the snap distance is resistance the user must cross to escape, so it is
+  tiny (8px); the pair test costs nothing and only decides whether a candidate exists.
+  Set both to 8 and two windows stacked with any normal gutter fall outside the gate,
+  no edge-alignment is ever offered, and that axis reads as dead. The gate scales with
+  the windows instead.
+- **The un-snapped position has to be tracked separately, or a snap cannot be escaped.**
+  The OS move loop offsets *its own* rectangle by each mouse message. Answer one
+  proposal with a snapped rectangle and that becomes the loop's baseline, so the hand's
+  travel is lost, every later proposal is measured from the magnet, and the escape
+  distance is silently infinite. `snapDrag` accumulates only the *delta* of each
+  proposal into a virtual position and snaps from that.
+
+Both have regression tests.
+
 ## Known limits
 
-- **No drag snapping.** The header is a `-webkit-app-region: drag` region, so the OS
-  runs the drag. Magnetic snapping would mean a `will-move` handler.
 - **Fullscreen-exclusive defeats any of this**, on every platform. The game must run
   windowed or borderless.
 - A driver that cannot composite a transparent frameless window renders it as a black
