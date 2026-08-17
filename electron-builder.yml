@@ -24,7 +24,10 @@ files:
   - '!**/*.map'
 win:
   target: [nsis, portable]
-  artifactName: ${productName}-${version}-${arch}.${ext}
+  # NO artifactName here. Both Windows targets emit a .exe, so one name for the
+  # pair means the second build silently OVERWRITES the first — nsis then
+  # portable, leaving only the portable exe, which is what v0.1.10 shipped. Each
+  # target names itself below instead.
 mac:
   target: [dmg]
 linux:
@@ -33,3 +36,7 @@ linux:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-${version}-${arch}-setup.${ext}
+
+portable:
+  artifactName: ${productName}-${version}-${arch}-portable.${ext}

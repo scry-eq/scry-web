@@ -17,11 +17,14 @@ jobs:
         include:
           - os: ubuntu-latest
             artifacts: release/*.AppImage
+            expect: 1
           - os: windows-latest
             # Both win targets: the NSIS installer and the portable exe.
             artifacts: release/*.exe
+            expect: 2
           - os: macos-latest
             artifacts: release/*.dmg
+            expect: 1
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
@@ -54,6 +57,21 @@ jobs:
 
       - name: Package
         run: bunx electron-builder --publish never
+
+      # `fail_on_unmatched_files` only fires when a glob matches NOTHING, so a
+      # target that quietly overwrote another still published — v0.1.10 shipped
+      # one Windows exe where two were configured, because both targets emitted
+      # the same filename. Counting is the check that catches that.
+      - name: Check the expected artifacts exist
+        shell: bash
+        run: |
+          ls -la release/ || true
+          n=$(ls -1 ${{ matrix.artifacts }} 2>/dev/null | wc -l)
+          echo "matched $n file(s), expected ${{ matrix.expect }}"
+          if [ "$n" -ne "${{ matrix.expect }}" ]; then
+            echo "::error::expected ${{ matrix.expect }} artifact(s) but found $n"
+            exit 1
+          fi
 
       - name: Upload to the release
         uses: softprops/action-gh-release@v3
