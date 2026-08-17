@@ -1,0 +1,57 @@
+name: Electron Release
+
+on:
+  push:
+    tags: ['v*']
+
+# The tag is the trigger, and the release is written back to it, so the token
+# needs write access to contents and nothing else.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifacts: release/*.AppImage
+          - os: windows-latest
+            artifacts: |
+              release/*.exe
+          - os: macos-latest
+            artifacts: release/*.dmg
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      # bun does not run install scripts, so electron's postinstall never fetches
+      # the runtime and every later step fails with "Electron failed to install
+      # correctly". Same reason `bun run electron:start` needs this locally.
+      - name: Fetch the Electron binary
+        run: node node_modules/electron/install.js
+
+      # src/gen is gitignored, so a fresh checkout has no protobuf bindings and
+      # the typecheck inside the build would fail before anything is compiled.
+      - run: bun run gen
+
+      - name: Build
+        run: bunx electron-builder --publish never
+
+      - name: Upload to the release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: scry-web ${{ github.ref_name }}
+          prerelease: true
+          files: ${{ matrix.artifacts }}
+          fail_on_unmatched_files: true

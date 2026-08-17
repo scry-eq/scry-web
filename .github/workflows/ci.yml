@@ -40,36 +40,3 @@ jobs:
           name: playwright-report
           path: scry-web/playwright-report
           retention-days: 7
-
-  # Populate the cargo-xwin MSVC CRT + Windows SDK cache scoped to main, so
-  # tag-triggered Tauri Release builds can restore it (cache scoping doesn't
-  # share between sibling tag refs, only with the default branch). Uses a
-  # throwaway minimal crate to trigger the xwin SDK download without needing
-  # the scry-web frontend — keeps the warm job small and self-contained.
-  warm-xwin-cache:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
-    runs-on: ubuntu-22.04
-    permissions:
-      contents: read
-    steps:
-      - uses: dtolnay/rust-toolchain@stable
-        with:
-          targets: x86_64-pc-windows-msvc
-
-      - run: sudo apt-get update && sudo apt-get install -y llvm clang lld
-
-      - uses: taiki-e/install-action@v2
-        with:
-          tool: cargo-xwin
-
-      - uses: actions/cache@v5
-        with:
-          path: ~/.cache/cargo-xwin
-          key: cargo-xwin-${{ runner.os }}-${{ runner.arch }}-v1
-
-      - name: Trigger xwin SDK splat (throwaway crate)
-        run: |
-          mkdir -p /tmp/xwin-warm/src && cd /tmp/xwin-warm
-          printf '[package]\nname = "warm"\nversion = "0.0.0"\nedition = "2021"\n' > Cargo.toml
-          echo 'fn main() {}' > src/main.rs
-          cargo xwin build --release --target x86_64-pc-windows-msvc
