@@ -82,10 +82,17 @@ export function Overlay() {
 
   const chrome = hover || !locked || !forwards;
 
+  // The MAP paints its own background, and its Fade slider is the control for it — so the
+  // shell must not add a second, fixed layer of black underneath. It did, and that is why
+  // fading the canvas to 5% still looked nearly solid: 75% of the darkness was never the
+  // canvas's to give back. Panels that are just text keep the backdrop; they need it to read.
+  const seeThrough = kind === 'map';
 
   return (
     <div
-      className="flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/25 bg-black/75 text-foreground shadow-lg backdrop-blur-sm"
+      className={`flex h-full w-full flex-col overflow-hidden rounded-lg border border-white/25 text-foreground shadow-lg ${
+        seeThrough ? '' : 'bg-black/75 backdrop-blur-sm'
+      }`}
     >
       {/* Always mounted, never display:none — the pointer has to be able to find it to get
           the overlay back, so only its opacity changes. */}
@@ -94,7 +101,7 @@ export function Overlay() {
         style={{ WebkitAppRegion: 'drag' } as React.CSSProperties}
         className={`flex h-7 shrink-0 items-center gap-2 border-b px-2 transition-opacity duration-150 ${
           chrome ? 'border-white/10 opacity-100' : 'border-transparent opacity-0'
-        } bg-white/5`}
+        } ${seeThrough ? 'bg-black/70' : 'bg-white/5'}`}
       >
         <span
           className={`h-2 w-2 shrink-0 rounded-full ${

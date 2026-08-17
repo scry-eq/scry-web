@@ -355,6 +355,21 @@ export function MapCanvas({
   useEffect(() => {
     localStorage.setItem(chromeKey('overlayCollapsed'), overlayCollapsed ? '1' : '0');
   }, [overlayCollapsed]);
+  // How solid the map's own background is. A docked panel is opaque; floating over the game
+  // the point is to see through it, so `compact` starts translucent and the user can tune it.
+  const [bgAlpha, setBgAlpha] = useState<number>(() => {
+    // Fully clear is a legitimate choice now that the shell adds nothing of its own, so the
+    // guard is >= 0 — treating a saved 0 as "missing" would snap it back to the default.
+    const raw = localStorage.getItem(chromeKey('bgAlpha'));
+    const v = raw === null ? NaN : Number(raw);
+    return Number.isFinite(v) && v >= 0 && v <= 1 ? v : compact ? 0.35 : 1;
+  });
+  const bgAlphaRef = useRef(bgAlpha);
+  useEffect(() => {
+    bgAlphaRef.current = bgAlpha;
+    localStorage.setItem(chromeKey('bgAlpha'), String(bgAlpha));
+  }, [bgAlpha]);
+
   const [infoCollapsed, setInfoCollapsed] = useState<boolean>(() => readCollapsed('infoCollapsed'));
   const infoCollapsedRef = useRef(infoCollapsed);
   useEffect(() => {
@@ -728,7 +743,10 @@ export function MapCanvas({
       const dpr = window.devicePixelRatio || 1;
       const w = canvas.width / dpr;
       const h = canvas.height / dpr;
-      ctx.fillStyle = '#0a0e12';
+      // Clear first: an alpha fill drawn over the previous frame would accumulate until the
+      // background was opaque again, taking the ghost of every earlier frame with it.
+      ctx.clearRect(0, 0, w, h);
+      ctx.fillStyle = `rgba(10, 14, 18, ${bgAlphaRef.current})`;
       ctx.fillRect(0, 0, w, h);
 
       const geom = store.map();
@@ -1270,7 +1288,10 @@ export function MapCanvas({
   };
 
   return (
-    <div ref={wrapRef} className="relative h-full w-full select-none bg-bg-base">
+    <div
+      ref={wrapRef}
+      className={`relative h-full w-full select-none ${compact ? '' : 'bg-bg-base'}`}
+    >
       <canvas
         ref={canvasRef}
         className="block cursor-grab active:cursor-grabbing"
@@ -1340,6 +1361,25 @@ export function MapCanvas({
           />
           <span className="w-8 shrink-0 text-right tabular-nums">{viewScale.toFixed(2)}x</span>
         </label>
+        {compact && (
+          <label className="mb-2 flex items-center gap-1 text-[11px] text-muted-foreground">
+            <span className="w-7 shrink-0">Fade</span>
+            <input
+              type="range"
+              min={0}
+              max={100}
+              step={5}
+              value={Math.round(bgAlpha * 100)}
+              onChange={(e) => setBgAlpha(Number(e.target.value) / 100)}
+              onInput={(e) => setBgAlpha(Number((e.target as HTMLInputElement).value) / 100)}
+              className="flex-1 accent-blue-500"
+              title="How solid the map background is over the game"
+            />
+            <span className="w-8 shrink-0 text-right tabular-nums">
+              {Math.round(bgAlpha * 100)}%
+            </span>
+          </label>
+        )}
         <label className="mb-2 flex items-center gap-1 text-[11px] text-foreground">
           <span className="w-7 shrink-0 text-muted-foreground">FPS</span>
           <select
