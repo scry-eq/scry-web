@@ -50,6 +50,16 @@ user cannot get back.
 
 ## Placement
 
+The MAIN window remembers its position too (`mainBounds` / `mainMaximized` in the
+same `shell.json`), including whether it was maximized. `getNormalBounds` is what
+gets recorded rather than `getBounds`, so a maximized window stores the rectangle
+it will UNMAXIMIZE to — recording the screen instead would restore a window with
+no way back to a smaller size. Maximizing happens before the first show, since
+doing it after is a visible snap on every launch. It is subject to the same
+still-on-a-display check as the overlays.
+
+## Overlay placement
+
 The window reopens where the user last left it — `moved`/`resized` persist to
 `shell.json` in the user data dir, debounced, with a flush on close so a drag that
 ends in closing the window is not lost. Only those events are hooked, so nothing

@@ -10,7 +10,11 @@ export type Bounds = { x: number; y: number; width: number; height: number };
 
 const file = (): string => join(app.getPath('userData'), 'shell.json');
 
-type Shape = { overlayBounds?: Partial<Record<OverlayKind, Bounds>> };
+type Shape = {
+  overlayBounds?: Partial<Record<OverlayKind, Bounds>>;
+  mainBounds?: Bounds;
+  mainMaximized?: boolean;
+};
 
 function read(): Shape {
   try {
@@ -23,6 +27,9 @@ function read(): Shape {
 }
 
 let pending: ReturnType<typeof setTimeout> | undefined;
+// Its own timer: the main window and an overlay can be dragged in the same
+// breath, and one debounce shared between them would drop whichever moved first.
+let mainPending: ReturnType<typeof setTimeout> | undefined;
 
 function write(next: Shape): void {
   try {
@@ -33,11 +40,35 @@ function write(next: Shape): void {
   }
 }
 
+/** The main window's last position, or null on a first run. */
+export function readMainBounds(): { bounds: Bounds | null; maximized: boolean } {
+  const s = read();
+  return { bounds: valid(s.mainBounds) ? (s.mainBounds as Bounds) : null, maximized: !!s.mainMaximized };
+}
+
+export function saveMainBounds(b: Bounds, maximized: boolean): void {
+  if (mainPending) clearTimeout(mainPending);
+  mainPending = setTimeout(() => {
+    mainPending = undefined;
+    write({ ...read(), mainBounds: b, mainMaximized: maximized });
+  }, 400);
+}
+
+export function flushMainBounds(b: Bounds, maximized: boolean): void {
+  if (mainPending) {
+    clearTimeout(mainPending);
+    mainPending = undefined;
+  }
+  write({ ...read(), mainBounds: b, mainMaximized: maximized });
+}
+
+function valid(b: Bounds | undefined): boolean {
+  return !!b && [b.x, b.y, b.width, b.height].every((n) => typeof n === 'number' && Number.isFinite(n));
+}
+
 export function readOverlayBounds(kind: OverlayKind): Bounds | null {
   const b = read().overlayBounds?.[kind];
-  if (!b) return null;
-  const ok = [b.x, b.y, b.width, b.height].every((n) => typeof n === 'number' && Number.isFinite(n));
-  return ok ? b : null;
+  return valid(b) ? (b as Bounds) : null;
 }
 
 function put(kind: OverlayKind, b: Bounds): void {
