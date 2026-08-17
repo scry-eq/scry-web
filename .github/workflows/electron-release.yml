@@ -101,6 +101,17 @@ jobs:
           AZURE_CODE_SIGNING_ACCOUNT: ${{ vars.AZURE_CODE_SIGNING_ACCOUNT }}
           AZURE_CERT_PROFILE: ${{ vars.AZURE_CERT_PROFILE }}
         run: |
+          # A secret that is not set arrives as the EMPTY STRING, not as an
+          # absent variable — and electron-builder reads a defined-but-empty
+          # CSC_LINK as "a certificate was supplied", then fails resolving ""
+          # as a path ("<workspace> not a file"). Absent has to mean absent.
+          for v in CSC_LINK CSC_KEY_PASSWORD APPLE_ID APPLE_APP_SPECIFIC_PASSWORD \
+                   APPLE_TEAM_ID AZURE_TENANT_ID AZURE_CLIENT_ID AZURE_CLIENT_SECRET \
+                   AZURE_PUBLISHER_NAME AZURE_ENDPOINT AZURE_CODE_SIGNING_ACCOUNT \
+                   AZURE_CERT_PROFILE; do
+            if [ -z "${!v}" ]; then unset "$v"; fi
+          done
+
           extra=()
 
           if [ "$RUNNER_OS" = "macOS" ]; then

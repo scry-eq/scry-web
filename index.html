@@ -23,7 +23,7 @@
           var mode = get('theme.mode');
           if (mode !== 'light' && mode !== 'dark') mode = 'system';
           var theme = get('theme.name');
-          if (theme !== 'shadui' && theme !== 'mui') theme = 'default';
+          if (theme !== 'shadui') theme = 'default';
           var resolved = mode;
           if (mode === 'system') {
             resolved = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
