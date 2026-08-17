@@ -1,17 +1,18 @@
 // Theme + colour-mode management. Two orthogonal axes:
 //   * mode  — system | light | dark   (resolves system → matchMedia)
-//   * theme — default | shadui        (palette family)
+//   * theme — default | shadui | mui  (palette family)
 // Both attributes are written to <html> as data-mode / data-theme; the
 // inline bootstrap in index.html applies them before paint to avoid a
 // flash. CSS in src/index.css keys off both attrs.
 
 export type Mode = 'system' | 'light' | 'dark';
-export type Theme = 'default' | 'shadui';
+export type Theme = 'default' | 'shadui' | 'mui';
 
 export const MODE_OPTIONS: Mode[] = ['system', 'light', 'dark'];
 export const THEME_OPTIONS: { value: Theme; label: string }[] = [
   { value: 'default', label: 'Default' },
   { value: 'shadui', label: 'ShadUI' },
+  { value: 'mui', label: 'MUI' },
 ];
 
 const KEY_MODE  = 'scry.theme.mode';
@@ -21,7 +22,7 @@ function isMode(v: unknown): v is Mode {
   return v === 'system' || v === 'light' || v === 'dark';
 }
 function isTheme(v: unknown): v is Theme {
-  return v === 'default' || v === 'shadui';
+  return v === 'default' || v === 'shadui' || v === 'mui';
 }
 
 export function getMode(): Mode {
