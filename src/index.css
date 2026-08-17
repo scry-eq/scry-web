@@ -1,5 +1,9 @@
 @import "tailwindcss";
 @import "tw-animate-css";
+@import "@fontsource/roboto/300.css";
+@import "@fontsource/roboto/400.css";
+@import "@fontsource/roboto/500.css";
+@import "@fontsource/roboto/700.css";
 
 /* Honor a manual data-mode override on <html> instead of relying on
    prefers-color-scheme alone — the theme bootstrap in index.html sets
@@ -157,5 +161,99 @@ html, body, #root {
   margin: 0;
   background: var(--background);
   color: var(--foreground);
-  font-family: ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+  font-family: var(--font-app, ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif);
+}
+
+/* Material UI-inspired semantic palette; component geometry stays shared. */
+:root[data-theme="mui"][data-mode="light"] {
+  color-scheme: light;
+  --font-app: 'Roboto', ui-sans-serif, system-ui, sans-serif;
+  --radius: 0.375rem;
+  --color-bg-base: #f5f5f5;
+  --color-bg-panel: #ffffff;
+  --color-bg-alt: #fafafa;
+  --background: #f5f5f5;
+  --foreground: #000000de;
+  --card: #ffffff;
+  --card-foreground: #000000de;
+  --popover: #ffffff;
+  --popover-foreground: #000000de;
+  --primary: #1976d2;
+  --primary-foreground: #ffffff;
+  --secondary: #eeeeee;
+  --secondary-foreground: #000000de;
+  --muted: #eeeeee;
+  --muted-foreground: #00000099;
+  --accent: #0000000a;
+  --accent-foreground: #000000de;
+  --destructive: #d32f2f;
+  --destructive-foreground: #ffffff;
+  --border: #0000001f;
+  --input: #0000003b;
+  --ring: #1976d2;
+}
+
+:root[data-theme="mui"][data-mode="dark"] {
+  color-scheme: dark;
+  --font-app: 'Roboto', ui-sans-serif, system-ui, sans-serif;
+  --radius: 0.375rem;
+  --color-bg-base: #121212;
+  --color-bg-panel: #121212;
+  --color-bg-alt: #1e1e1e;
+  --background: #121212;
+  --foreground: #ffffffde;
+  --card: #121212;
+  --card-foreground: #ffffffde;
+  --popover: #1e1e1e;
+  --popover-foreground: #ffffffde;
+  --primary: #90caf9;
+  --primary-foreground: #000000de;
+  --secondary: #ffffff14;
+  --secondary-foreground: #ffffffde;
+  --muted: #ffffff14;
+  --muted-foreground: #ffffffb3;
+  --accent: #ffffff14;
+  --accent-foreground: #ffffff;
+  --destructive: #f44336;
+  --destructive-foreground: #000000de;
+  --border: #ffffff1f;
+  --input: #ffffff3b;
+  --ring: #90caf9;
+}
+
+:root[data-theme="mui"] input,
+:root[data-theme="mui"] select,
+:root[data-theme="mui"] textarea {
+  accent-color: var(--primary);
+}
+
+:root[data-theme="mui"] button,
+:root[data-theme="mui"] input,
+:root[data-theme="mui"] select,
+:root[data-theme="mui"] textarea,
+:root[data-theme="mui"] [role="menuitem"],
+:root[data-theme="mui"] [role="radio"] {
+  transition-property: color, background-color, border-color, box-shadow, opacity;
+  transition-duration: 150ms;
+}
+
+:root[data-theme="mui"] button:focus-visible,
+:root[data-theme="mui"] input:focus-visible,
+:root[data-theme="mui"] select:focus-visible,
+:root[data-theme="mui"] textarea:focus-visible,
+:root[data-theme="mui"] [role="menuitem"]:focus-visible,
+:root[data-theme="mui"] [role="radio"]:focus-visible {
+  outline: 2px solid color-mix(in srgb, var(--ring) 55%, transparent);
+  outline-offset: 1px;
+}
+
+:root[data-theme="mui"] :disabled,
+:root[data-theme="mui"] [data-disabled] {
+  opacity: 0.38;
+}
+
+:root[data-theme="mui"] [data-slot$="-content"],
+:root[data-theme="mui"] [role="dialog"] > div,
+:root[data-theme="mui"] [data-fw-id] {
+  box-shadow: 0 5px 5px -3px #0003, 0 8px 10px 1px #00000024, 0 3px 14px 2px #0000001f;
 }
