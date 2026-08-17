@@ -1,0 +1,107 @@
+name: Electron Release
+
+on:
+  push:
+    tags: ['v*']
+
+# The tag is the trigger, and the release is written back to it, so the token
+# needs write access to contents and nothing else.
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            artifacts: release/*.AppImage
+            expect: 1
+          - os: windows-latest
+            # Both win targets: the NSIS installer and the portable exe.
+            artifacts: release/*.exe
+            expect: 2
+          - os: macos-latest
+            # arm64 + x64.
+            artifacts: release/*.dmg
+            expect: 2
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          submodules: recursive
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - run: bun install --frozen-lockfile
+
+      # bun does not run install scripts, so electron's postinstall never fetches
+      # the runtime and every later step fails with "Electron failed to install
+      # correctly". Same reason `bun run electron:start` needs this locally.
+      - name: Fetch the Electron binary
+        run: node node_modules/electron/install.js
+
+      # src/gen is gitignored, so a fresh checkout has no protobuf bindings and
+      # the typecheck inside the build would fail before anything is compiled.
+      - run: bun run gen
+
+      # electron-builder only PACKAGES: it copies `out/` into the asar and never
+      # compiles it. Without this the packager still runs, and fails at the very
+      # end with `out/main/index.js was not found in this archive`. Locally the
+      # directory already existed from a previous run, which is exactly why this
+      # was not caught before tagging.
+      - name: Compile main, preload and renderer
+        run: bun run electron:build
+
+      # THE TAG IS THE VERSION. electron-builder reads it from package.json,
+      # which meant tagging without bumping that file first produced artifacts
+      # stamped with the previous version — a step easy to forget and invisible
+      # until the filenames come out wrong. `extraMetadata.version` overrides it
+      # for this build only, without mutating the tree, and it sets the version
+      # the packaged app reports as well as the one in the artifact names.
+      #
+      # package.json keeps its own version as the DEV default, for a local
+      # `bun run electron:dist` that has no tag to read.
+      - name: Version from the tag
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          case "$v" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::tag '${GITHUB_REF_NAME}' is not vMAJOR.MINOR.PATCH"; exit 1 ;;
+          esac
+          echo "APP_VERSION=$v" >> "$GITHUB_ENV"
+          echo "building version $v"
+
+      - name: Package
+        shell: bash
+        run: |
+          bunx electron-builder --publish never \
+            --config.extraMetadata.version="$APP_VERSION"
+
+      # `fail_on_unmatched_files` only fires when a glob matches NOTHING, so a
+      # target that quietly overwrote another still published — v0.1.10 shipped
+      # one Windows exe where two were configured, because both targets emitted
+      # the same filename. Counting is the check that catches that.
+      - name: Check the expected artifacts exist
+        shell: bash
+        run: |
+          ls -la release/ || true
+          n=$(ls -1 ${{ matrix.artifacts }} 2>/dev/null | wc -l)
+          echo "matched $n file(s), expected ${{ matrix.expect }}"
+          if [ "$n" -ne "${{ matrix.expect }}" ]; then
+            echo "::error::expected ${{ matrix.expect }} artifact(s) but found $n"
+            exit 1
+          fi
+
+      - name: Upload to the release
+        uses: softprops/action-gh-release@v3
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: scry-web ${{ github.ref_name }}
+          prerelease: true
+          files: ${{ matrix.artifacts }}
+          fail_on_unmatched_files: true
