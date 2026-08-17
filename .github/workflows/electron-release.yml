@@ -44,7 +44,15 @@ jobs:
       # the typecheck inside the build would fail before anything is compiled.
       - run: bun run gen
 
-      - name: Build
+      # electron-builder only PACKAGES: it copies `out/` into the asar and never
+      # compiles it. Without this the packager still runs, and fails at the very
+      # end with `out/main/index.js was not found in this archive`. Locally the
+      # directory already existed from a previous run, which is exactly why this
+      # was not caught before tagging.
+      - name: Compile main, preload and renderer
+        run: bun run electron:build
+
+      - name: Package
         run: bunx electron-builder --publish never
 
       - name: Upload to the release
