@@ -11,6 +11,7 @@ import { BrowserWindow, screen, shell } from 'electron';
 import { join } from 'node:path';
 import { DEFAULT_SIZE, MIN_SIZE, OVERLAY_KINDS, type OverlayKind } from './kinds';
 import { flushOverlayBounds, readOverlayBounds, saveOverlayBounds, type Bounds } from './store';
+import { newDragSession, snapDrag, type SnapTargets } from './snap';
 
 /**
  * Can a click-through window still receive mouse-MOVES? `setIgnoreMouseEvents`'s `forward`
@@ -126,6 +127,49 @@ function onScreen(kind: OverlayKind, b: Bounds | null): Bounds | null {
   };
 }
 
+/**
+ * What a drag can line up against: every other window this app owns that is actually on
+ * screen, and the work area of each display — so a snapped window lands beside the taskbar
+ * rather than under it.
+ */
+function snapTargets(self: BrowserWindow): SnapTargets {
+  return {
+    windows: BrowserWindow.getAllWindows()
+      .filter((w) => w !== self && !w.isDestroyed() && w.isVisible())
+      .map((w) => w.getBounds()),
+    screens: screen.getAllDisplays().map((d) => d.workArea),
+  };
+}
+
+/**
+ * Magnetize this window's drags.
+ *
+ * `will-move` is the only seam there is: the header is an OS drag region, so the renderer
+ * never sees a mousemove and has nothing to correct. This is the one event that fires with
+ * the rectangle the OS is about to apply, and that `preventDefault()` can veto — so the
+ * mechanism is "refuse the move the OS wanted, apply the one we want".
+ *
+ * Windows/macOS only; on Linux the event never fires and a drag behaves exactly as it always
+ * has. And `setBounds` can itself provoke `will-move`, so a listener that answered its own
+ * write would be a feedback loop inside the drag — hence the guard.
+ */
+function installSnap(w: BrowserWindow): void {
+  const session = newDragSession();
+  let applying = false;
+  w.on('will-move', (event, proposed) => {
+    if (applying) return;
+    const snapped = snapDrag(session, proposed, snapTargets(w), Date.now());
+    if (snapped.x === proposed.x && snapped.y === proposed.y) return;
+    event.preventDefault();
+    applying = true;
+    try {
+      w.setBounds(snapped);
+    } finally {
+      applying = false;
+    }
+  });
+}
+
 export function createOverlayWindow(kind: OverlayKind, title: string): BrowserWindow {
   const existing = getOverlayWindow(kind);
   if (existing) {
@@ -181,6 +225,8 @@ export function createOverlayWindow(kind: OverlayKind, title: string): BrowserWi
     w.setAlwaysOnTop(true, 'screen-saver');
     setOverlayLocked(kind, isOverlayLocked(kind));
   });
+
+  installSnap(w);
 
   // Persist the user's own placement. 'moved'/'resized' only fire for a real move, so
   // nothing here records a position the app chose for itself.

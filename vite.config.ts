@@ -36,6 +36,6 @@ export default defineConfig({
     // render React components in unit tests (the panel/drag UI lives
     // in playwright e2e instead).
     environment: 'happy-dom',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'electron/**/*.test.ts'],
   },
 });
