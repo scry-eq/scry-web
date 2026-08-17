@@ -55,8 +55,29 @@ jobs:
       - name: Compile main, preload and renderer
         run: bun run electron:build
 
+      # THE TAG IS THE VERSION. electron-builder reads it from package.json,
+      # which meant tagging without bumping that file first produced artifacts
+      # stamped with the previous version — a step easy to forget and invisible
+      # until the filenames come out wrong. `extraMetadata.version` overrides it
+      # for this build only, without mutating the tree, and it sets the version
+      # the packaged app reports as well as the one in the artifact names.
+      #
+      # package.json keeps its own version as the DEV default, for a local
+      # `bun run electron:dist` that has no tag to read.
+      - name: Version from the tag
+        shell: bash
+        run: |
+          v="${GITHUB_REF_NAME#v}"
+          case "$v" in
+            [0-9]*.[0-9]*.[0-9]*) ;;
+            *) echo "::error::tag '${GITHUB_REF_NAME}' is not vMAJOR.MINOR.PATCH"; exit 1 ;;
+          esac
+          echo "APP_VERSION=$v" >> "$GITHUB_ENV"
+          echo "building version $v"
+
       - name: Package
-        run: bunx electron-builder --publish never
+        shell: bash
+        run: bunx electron-builder --publish never --config.extraMetadata.version="$APP_VERSION"
 
       # `fail_on_unmatched_files` only fires when a glob matches NOTHING, so a
       # target that quietly overwrote another still published — v0.1.10 shipped
