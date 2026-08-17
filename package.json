@@ -1,7 +1,7 @@
 {
   "name": "scry-web",
   "private": true,
-  "version": "0.0.1",
+  "version": "0.1.11",
   "type": "module",
   "scripts": {
     "prepare": "git config core.hooksPath scripts/hooks 2>/dev/null || true",
@@ -13,11 +13,14 @@
     "smoke": "bun scripts/smoke-test.ts",
     "test": "vitest run",
     "test:e2e": "playwright test",
-    "tauri:dev": "bunx tauri dev",
-    "tauri:build": "bunx tauri build"
+    "electron:dev": "electron-vite dev",
+    "electron:build": "electron-vite build",
+    "electron:dist": "electron-vite build && electron-builder",
+    "electron:start": "electron ."
   },
   "dependencies": {
     "@bufbuild/protobuf": "^2.14.0",
+    "@fontsource/roboto": "^5.3.0",
     "@tanstack/react-table": "^9.1.2",
     "@tanstack/react-virtual": "^3.14.9",
     "clsx": "^2.1.1",
@@ -36,17 +39,19 @@
     "@bufbuild/protoc-gen-es": "^2.14.0",
     "@playwright/test": "^1.62.1",
     "@tailwindcss/vite": "^4.3.3",
-    "@tauri-apps/api": "^2.11.1",
-    "@tauri-apps/cli": "^2.11.4",
     "@types/react": "^19.2.18",
     "@types/react-dom": "^19.2.4",
     "@types/ws": "^8.18.1",
     "@vitejs/plugin-react": "^6.0.5",
+    "electron": "^43.2.0",
+    "electron-builder": "^26.15.7",
+    "electron-vite": "^5.0.0",
     "happy-dom": "^20.11.2",
     "tailwindcss": "^4.3.3",
     "typescript": "^7.0.2",
     "vite": "^8.2.1",
     "vitest": "^4.1.10",
     "ws": "^8.21.3"
-  }
+  },
+  "main": "./out/main/index.js"
 }

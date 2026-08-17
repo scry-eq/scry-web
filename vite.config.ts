@@ -8,7 +8,7 @@ import { dirname, resolve } from 'node:path';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
 export default defineConfig({
-  base: process.env.GITHUB_ACTIONS && !process.env.TAURI_ENV_PLATFORM ? '/scry-web/' : '/',
+  base: process.env.GITHUB_ACTIONS ? '/scry-web/' : '/',
   plugins: [react(), tailwindcss()],
   resolve: {
     alias: {
@@ -19,18 +19,12 @@ export default defineConfig({
   server: {
     port: 5173,
     strictPort: true,
-    watch: {
-      // src-tauri/target is Rust build output — ~28k files, which alone blows
-      // past the system inotify limit and kills the dev server with ENOSPC.
-      // Tauri watches its own side; Vite has no reason to.
-      ignored: ['**/src-tauri/**'],
-    },
   },
   build: {
     chunkSizeWarningLimit: 700,
     rollupOptions: {
-      // Two pages: the app, and the transparent overlay window Tauri opens as its own
-      // WebviewWindow. Both are served by the same dev server in `tauri dev`.
+      // Two pages: the app, and the transparent overlay window the shell opens as its own
+      // BrowserWindow. Both are served by the same dev server in `electron:dev`.
       input: {
         main: resolve(__dirname, 'index.html'),
         overlay: resolve(__dirname, 'overlay.html'),

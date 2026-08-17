@@ -12,3 +12,19 @@ export const URL_STORAGE_KEY = 'scry.daemonUrl';
 export function daemonUrl(): string {
   return localStorage.getItem(URL_STORAGE_KEY) || DEFAULT_URL;
 }
+
+/**
+ * `SCRY_DAEMON_URL=...` / `--url ...` from the desktop shell, or null.
+ *
+ * Wins over the stored value and is written back to it, so it CORRECTS a bad address rather
+ * than shadowing it — the field shows what is in use, and the next launch without the
+ * override keeps it.
+ */
+export async function daemonUrlOverride(): Promise<string | null> {
+  if (typeof window === 'undefined' || !window.scry) return null;
+  try {
+    return await window.scry.daemonUrlOverride();
+  } catch {
+    return null;
+  }
+}

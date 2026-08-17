@@ -1,0 +1,51 @@
+appId: com.scryeq.web
+# The SHIPPED name is the product's, not the repo's: the binary is `scry`, the
+# way scry-cpp's is `scryd`. The repo and npm package stay scry-web because the
+# same tree also builds the web client.
+#
+# Electron derives app.getPath('userData') from this, so changing it moves
+# shell.json — %APPDATA%/scry-web -> %APPDATA%/scry on Windows. Window positions
+# saved under the old name are not read from the new one. appId is deliberately
+# NOT changed: it is the install identity, and moving it would orphan an
+# existing install rather than upgrade it.
+productName: scry
+# Windows takes the exe name from productName, but Linux defaults it to the
+# PACKAGE name (scry-web) — so without this the AppImage is called scry and the
+# binary inside it is not.
+executableName: scry
+directories:
+  buildResources: build
+  # NOT the default `dist` — that is the Vite web bundle's output, and Vite
+  # empties its outDir on every build, so installers written there are deleted
+  # by the next `bun run build`.
+  output: release
+files:
+  - out/**
+  - '!**/*.map'
+win:
+  target: [nsis, portable]
+  # NO artifactName here. Both Windows targets emit a .exe, so one name for the
+  # pair means the second build silently OVERWRITES the first — nsis then
+  # portable, leaving only the portable exe, which is what v0.1.10 shipped. Each
+  # target names itself below instead.
+mac:
+  # Both arches: Apple silicon AND Intel. Without the explicit list electron-
+  # builder builds only for the runner's own arch, and GitHub's macos-latest is
+  # arm64 — which is why v0.1.10 and v0.1.11 shipped no Intel dmg.
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # Named explicitly rather than relying on the default carrying ${arch}: two
+  # builds writing one filename is the bug that shipped v0.1.10 with a single
+  # Windows exe, and it is silent when it happens.
+  artifactName: ${productName}-${version}-${arch}.${ext}
+linux:
+  target: [AppImage]
+  category: Utility
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  artifactName: ${productName}-${version}-${arch}-setup.${ext}
+
+portable:
+  artifactName: ${productName}-${version}-${arch}-portable.${ext}

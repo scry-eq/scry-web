@@ -231,6 +231,7 @@ export function MapCanvas({
   smoothMovement,
   predictiveMovement,
   panToXY,
+  compact = false,
 }: {
   store: SpawnStore;
   client: SeqClient | null;
@@ -242,6 +243,13 @@ export function MapCanvas({
   smoothMovement: boolean;
   predictiveMovement: boolean;
   panToXY?: { x: number; y: number; v: number } | null;
+  /**
+   * Rendering into a small floating overlay rather than a panel. The view controls and the
+   * info box start COLLAPSED — they cost half the window at overlay sizes — and their
+   * collapse state gets its own storage keys, so folding them here does not fold the main
+   * window's map too.
+   */
+  compact?: boolean;
 }) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const wrapRef = useRef<HTMLDivElement | null>(null);
@@ -336,19 +344,22 @@ export function MapCanvas({
   const [visibleLayers, setVisibleLayers] = useState<Set<number>>(new Set());
   const visibleLayersRef = useRef(visibleLayers);
   useEffect(() => { visibleLayersRef.current = visibleLayers; }, [visibleLayers]);
-  const [overlayCollapsed, setOverlayCollapsed] = useState<boolean>(
-    () => localStorage.getItem('map.overlayCollapsed') === '1',
+  const chromeKey = (name: string): string => (compact ? `map.compact.${name}` : `map.${name}`);
+  const readCollapsed = (name: string): boolean => {
+    const v = localStorage.getItem(chromeKey(name));
+    return v === null ? compact : v === '1';
+  };
+  const [overlayCollapsed, setOverlayCollapsed] = useState<boolean>(() =>
+    readCollapsed('overlayCollapsed'),
   );
   useEffect(() => {
-    localStorage.setItem('map.overlayCollapsed', overlayCollapsed ? '1' : '0');
+    localStorage.setItem(chromeKey('overlayCollapsed'), overlayCollapsed ? '1' : '0');
   }, [overlayCollapsed]);
-  const [infoCollapsed, setInfoCollapsed] = useState<boolean>(
-    () => localStorage.getItem('map.infoCollapsed') === '1',
-  );
+  const [infoCollapsed, setInfoCollapsed] = useState<boolean>(() => readCollapsed('infoCollapsed'));
   const infoCollapsedRef = useRef(infoCollapsed);
   useEffect(() => {
     infoCollapsedRef.current = infoCollapsed;
-    localStorage.setItem('map.infoCollapsed', infoCollapsed ? '1' : '0');
+    localStorage.setItem(chromeKey('infoCollapsed'), infoCollapsed ? '1' : '0');
   }, [infoCollapsed]);
   // Grid (mirrors showeq-c's MapData::paintGrid). Resolution in world
   // units — 500 matches mapcore.cpp:75. Default-on per the user request.

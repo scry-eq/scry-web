@@ -9,6 +9,7 @@ floating-window/docking system, and the coordinate/con-color conventions.
 ## Stack
 
 - React + TypeScript, Vite.
+- Electron for the desktop shell (electron-vite + electron-builder).
 - Tailwind v4, TanStack Table, shadcn/ui (Radix-backed, à la carte
   components under `src/components/ui/`), zustand for cross-cutting state.
 - **Use `~/.bun/bin/bun` for all JS tooling** — system Node 18 breaks
@@ -23,8 +24,8 @@ floating-window/docking system, and the coordinate/con-color conventions.
   `concolor.ts`, `classes.ts`
 - `src/overlay/` — the transparent always-on-top overlay window's page
   (`overlay.html` is a second Vite entry; see `docs/overlay.md`)
-- `src-tauri/` — the Tauri desktop shell: window policy, overlay window,
-  per-window capabilities
+- `electron/` — the desktop shell (main + two preloads): window policy and
+  the overlay window. The renderer is the SAME tree the web build uses.
 - `src/**/*.test.ts` — vitest unit tests (happy-dom env)
 - `e2e/**/*.spec.ts` — playwright e2e tests
 - `scripts/` — `diag-movement.ts`, `watch-smoother.ts` (live-state
@@ -40,8 +41,11 @@ floating-window/docking system, and the coordinate/con-color conventions.
 - `bun run test:e2e` — playwright e2e tests (against the local vite dev
   server, auto-started)
 - `bun run smoke`
-- `bun run tauri:dev` / `bun run tauri:build` — the desktop shell. Both
-  drive Vite on :5173, so they collide with a `bun run dev` already up.
+- `bun run electron:dev` / `bun run electron:build` / `bun run electron:dist`
+  — the desktop shell. `electron:dev` drives Vite on :5173, so it collides
+  with a `bun run dev` already up.
+- Electron's binary is not installed by `bun install` (postinstall is
+  skipped): run `node node_modules/electron/install.js` once.
 
 ## Conventions
 
@@ -80,6 +84,5 @@ floating-window/docking system, and the coordinate/con-color conventions.
   three zustand stores + `localPrefs`), the FloatingWindow/panel-docking
   system, the coordinate convention, con-color/chat-color source of truth,
   map rendering rules, and live-state debugging recipes.
-- [`docs/overlay.md`](docs/overlay.md) — the transparent always-on-top
-  overlay window: why its hover sensor polls, the per-platform shims, and
-  what Tauri cannot express.
+- [`docs/overlay.md`](docs/overlay.md) — the overlay windows: click-through,
+  and the build-shape rules that fail silently.
