@@ -29,7 +29,16 @@ win:
   # portable, leaving only the portable exe, which is what v0.1.10 shipped. Each
   # target names itself below instead.
 mac:
-  target: [dmg]
+  # Both arches: Apple silicon AND Intel. Without the explicit list electron-
+  # builder builds only for the runner's own arch, and GitHub's macos-latest is
+  # arm64 — which is why v0.1.10 and v0.1.11 shipped no Intel dmg.
+  target:
+    - target: dmg
+      arch: [arm64, x64]
+  # Named explicitly rather than relying on the default carrying ${arch}: two
+  # builds writing one filename is the bug that shipped v0.1.10 with a single
+  # Windows exe, and it is silent when it happens.
+  artifactName: ${productName}-${version}-${arch}.${ext}
 linux:
   target: [AppImage]
   category: Utility

@@ -23,8 +23,9 @@ jobs:
             artifacts: release/*.exe
             expect: 2
           - os: macos-latest
+            # arm64 + x64.
             artifacts: release/*.dmg
-            expect: 1
+            expect: 2
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v5
