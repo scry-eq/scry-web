@@ -344,6 +344,28 @@ export function MapCanvas({
   const [visibleLayers, setVisibleLayers] = useState<Set<number>>(new Set());
   const visibleLayersRef = useRef(visibleLayers);
   useEffect(() => { visibleLayersRef.current = visibleLayers; }, [visibleLayers]);
+
+  // WHICH LAYERS THE USER HAS TURNED OFF — persisted, and deliberately the inverse of what
+  // is shown. Storing the HIDDEN set means a layer the user has never seen (a new zone with
+  // a layer 3) still defaults to visible, while "I always turn 2 off" survives every zone
+  // load. Storing the visible set instead would hide anything new by default.
+  //
+  // NOT scoped to the overlay/docked split like the chrome state: this is a statement about
+  // the maps themselves, so both views honour the one answer.
+  const [hiddenLayers, setHiddenLayers] = useState<Set<number>>(() => {
+    try {
+      const raw = localStorage.getItem('map.hiddenLayers');
+      const parsed: unknown = raw ? JSON.parse(raw) : [];
+      return new Set(Array.isArray(parsed) ? parsed.filter((n) => typeof n === 'number') : []);
+    } catch {
+      return new Set();
+    }
+  });
+  const hiddenLayersRef = useRef(hiddenLayers);
+  useEffect(() => {
+    hiddenLayersRef.current = hiddenLayers;
+    localStorage.setItem('map.hiddenLayers', JSON.stringify([...hiddenLayers]));
+  }, [hiddenLayers]);
   const chromeKey = (name: string): string => (compact ? `map.compact.${name}` : `map.${name}`);
   const readCollapsed = (name: string): boolean => {
     const v = localStorage.getItem(chromeKey(name));
@@ -352,9 +374,6 @@ export function MapCanvas({
   const [overlayCollapsed, setOverlayCollapsed] = useState<boolean>(() =>
     readCollapsed('overlayCollapsed'),
   );
-  useEffect(() => {
-    localStorage.setItem(chromeKey('overlayCollapsed'), overlayCollapsed ? '1' : '0');
-  }, [overlayCollapsed]);
   // How solid the map's own background is. A docked panel is opaque; floating over the game
   // the point is to see through it, so `compact` starts translucent and the user can tune it.
   const [bgAlpha, setBgAlpha] = useState<number>(() => {
@@ -369,7 +388,9 @@ export function MapCanvas({
     bgAlphaRef.current = bgAlpha;
     localStorage.setItem(chromeKey('bgAlpha'), String(bgAlpha));
   }, [bgAlpha]);
-
+  useEffect(() => {
+    localStorage.setItem(chromeKey('overlayCollapsed'), overlayCollapsed ? '1' : '0');
+  }, [overlayCollapsed]);
   const [infoCollapsed, setInfoCollapsed] = useState<boolean>(() => readCollapsed('infoCollapsed'));
   const infoCollapsedRef = useRef(infoCollapsed);
   useEffect(() => {
@@ -517,6 +538,10 @@ export function MapCanvas({
       for (const l of geom.lines) layers.add(l.layer);
       for (const l of geom.locations) layers.add(l.layer);
     }
+    // Everything the new geometry offers, less what the user has said they do not want.
+    // Read through the ref so a change of preference does not re-run this effect and
+    // re-show a layer mid-zone.
+    for (const off of hiddenLayersRef.current) layers.delete(off);
     setVisibleLayers(layers);
   }, [tick, store]);
 
@@ -1270,16 +1295,30 @@ export function MapCanvas({
   const activeMapPackage = store.activeMapPackage();
 
   const toggleLayer = (layer: number) => {
+    const show = !visibleLayers.has(layer);
     setVisibleLayers((prev) => {
       const next = new Set(prev);
-      if (next.has(layer)) next.delete(layer);
+      if (show) next.add(layer);
+      else next.delete(layer);
+      return next;
+    });
+    // The preference is the other half of the same click, so it moves with it.
+    setHiddenLayers((prev) => {
+      const next = new Set(prev);
+      if (show) next.delete(layer);
       else next.add(layer);
       return next;
     });
   };
 
-  const allOn = () => setVisibleLayers(new Set(availableLayers));
-  const allOff = () => setVisibleLayers(new Set());
+  const allOn = () => {
+    setVisibleLayers(new Set(availableLayers));
+    setHiddenLayers(new Set());
+  };
+  const allOff = () => {
+    setVisibleLayers(new Set());
+    setHiddenLayers(new Set(availableLayers));
+  };
 
   const resetView = () => {
     setZoom(1);
