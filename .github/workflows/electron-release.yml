@@ -76,11 +76,68 @@ jobs:
           echo "APP_VERSION=$v" >> "$GITHUB_ENV"
           echo "building version $v"
 
+      # SIGNING IS OPT-IN VIA SECRETS, and absent secrets this is exactly the
+      # unsigned build that shipped v0.1.12. Nothing here fails because a
+      # certificate is missing — it only stops warning users when one exists.
+      #
+      # macOS  MAC_CSC_LINK (base64 .p12), MAC_CSC_KEY_PASSWORD
+      #        APPLE_ID, APPLE_APP_SPECIFIC_PASSWORD, APPLE_TEAM_ID  (notarize)
+      # win    AZURE_TENANT_ID, AZURE_CLIENT_ID, AZURE_CLIENT_SECRET
+      #        + vars AZURE_PUBLISHER_NAME, AZURE_ENDPOINT,
+      #          AZURE_CODE_SIGNING_ACCOUNT, AZURE_CERT_PROFILE
       - name: Package
         shell: bash
+        env:
+          CSC_LINK: ${{ secrets.MAC_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.MAC_CSC_KEY_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+          AZURE_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+          AZURE_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+          AZURE_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+          AZURE_PUBLISHER_NAME: ${{ vars.AZURE_PUBLISHER_NAME }}
+          AZURE_ENDPOINT: ${{ vars.AZURE_ENDPOINT }}
+          AZURE_CODE_SIGNING_ACCOUNT: ${{ vars.AZURE_CODE_SIGNING_ACCOUNT }}
+          AZURE_CERT_PROFILE: ${{ vars.AZURE_CERT_PROFILE }}
         run: |
+          extra=()
+
+          if [ "$RUNNER_OS" = "macOS" ]; then
+            if [ -n "$CSC_LINK" ]; then
+              echo "macOS: signing with the supplied Developer ID"
+              if [ -n "$APPLE_ID" ] && [ -n "$APPLE_TEAM_ID" ]; then
+                # Signing alone does NOT clear Gatekeeper on a downloaded dmg —
+                # it has to be notarized and the ticket stapled.
+                echo "macOS: notarizing"
+                extra+=(--config.mac.notarize=true)
+              else
+                echo "macOS: signed but NOT notarized — Gatekeeper will still warn"
+              fi
+            else
+              # Without this electron-builder hunts the keychain for an identity;
+              # on a runner there is none, and the hunt is noise at best.
+              echo "macOS: no certificate — building unsigned"
+              export CSC_IDENTITY_AUTO_DISCOVERY=false
+            fi
+          fi
+
+          if [ "$RUNNER_OS" = "Windows" ]; then
+            if [ -n "$AZURE_CLIENT_ID" ] && [ -n "$AZURE_CERT_PROFILE" ]; then
+              echo "Windows: signing via Azure Trusted Signing"
+              extra+=(
+                --config.win.azureSignOptions.publisherName="$AZURE_PUBLISHER_NAME"
+                --config.win.azureSignOptions.endpoint="$AZURE_ENDPOINT"
+                --config.win.azureSignOptions.codeSigningAccountName="$AZURE_CODE_SIGNING_ACCOUNT"
+                --config.win.azureSignOptions.certificateProfileName="$AZURE_CERT_PROFILE"
+              )
+            else
+              echo "Windows: no signing credentials — building unsigned"
+            fi
+          fi
+
           bunx electron-builder --publish never \
-            --config.extraMetadata.version="$APP_VERSION"
+            --config.extraMetadata.version="$APP_VERSION" "${extra[@]}"
 
       # `fail_on_unmatched_files` only fires when a glob matches NOTHING, so a
       # target that quietly overwrote another still published — v0.1.10 shipped

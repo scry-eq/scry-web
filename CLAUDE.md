@@ -85,4 +85,7 @@ floating-window/docking system, and the coordinate/con-color conventions.
   system, the coordinate convention, con-color/chat-color source of truth,
   map rendering rules, and live-state debugging recipes.
 - [`docs/overlay.md`](docs/overlay.md) — the overlay windows: click-through,
-  and the build-shape rules that fail silently.
+  drag snapping, per-kind bounds, and the build-shape rules that fail silently.
+- [`docs/signing.md`](docs/signing.md) — code signing for the desktop builds:
+  which secrets the release workflow reads, what they cost, and the by-hand
+  workarounds while the builds are unsigned.
