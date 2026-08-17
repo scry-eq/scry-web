@@ -18,8 +18,8 @@ jobs:
           - os: ubuntu-latest
             artifacts: release/*.AppImage
           - os: windows-latest
-            artifacts: |
-              release/*.exe
+            # Both win targets: the NSIS installer and the portable exe.
+            artifacts: release/*.exe
           - os: macos-latest
             artifacts: release/*.dmg
     runs-on: ${{ matrix.os }}
