@@ -18,7 +18,12 @@ import {
 } from '@/components/ui/tabs';
 import { ChatColorsPanel } from './ChatColorsPanel';
 import { SeqClient } from '../net/client';
-import { DEFAULT_URL, URL_STORAGE_KEY, daemonUrlOverride } from '../net/daemonUrl';
+import {
+  DEFAULT_URL,
+  URL_STORAGE_KEY,
+  daemonUrlOverride,
+  sessionUrlFromLocation,
+} from '../net/daemonUrl';
 import { selectFromPacket } from '../state/selectFromPackets';
 import { SpawnStore } from '../state/store';
 import { OverlayToggle } from './OverlayToggle';
@@ -142,10 +147,18 @@ const FLEX_GROW_PANELS = new Set<PanelKey>(['spawns', 'spawnPoints', 'combat', '
 const SNAP_THRESHOLD_PX = 32;
 
 
+// Computed once at load: the page URL can't change without a reload (no router).
+const SESSION_URL = sessionUrlFromLocation();
+
 export function App() {
-  const store = useMemo(() => new SpawnStore(), []);
+  // Keyed on the daemon URL so switching sessions/daemons starts from a clean
+  // slate — chat, combat and loot logs live in here, and without the reset
+  // they bleed from the previous session into the next.
+  const [url, setUrl] = useState(
+    () => SESSION_URL || localStorage.getItem(URL_STORAGE_KEY) || DEFAULT_URL,
+  );
+  const store = useMemo(() => new SpawnStore(), [url]);
   const [status, setStatus] = useState<ConnStatus>('disconnected');
-  const [url, setUrl] = useState(() => localStorage.getItem(URL_STORAGE_KEY) || DEFAULT_URL);
   const [urlDraft, setUrlDraft] = useState(url);
   const [urlHistory, setUrlHistory] = useState<string[]>(loadUrlHistory);
   // Don't promote a URL to history until the WebSocket actually opens.
@@ -387,8 +400,10 @@ export function App() {
     setSelectVersion((v) => v + 1);
   };
 
-  // An address supplied by the shell replaces the stored one before anything connects.
+  // An address supplied by the shell replaces the stored one before anything
+  // connects. A /s/<id> page URL outranks it — the link IS the selection.
   useEffect(() => {
+    if (SESSION_URL) return;
     void daemonUrlOverride().then((v) => {
       if (!v || v === url) return;
       localStorage.setItem(URL_STORAGE_KEY, v);
@@ -408,6 +423,9 @@ export function App() {
 
   useEffect(() => {
     setStatus('connecting');
+    // Box identity is per-daemon: a stale picker from the previous connection
+    // would offer boxes the new daemon has never heard of.
+    useBoxStore.getState().setBoxes([], '');
     const client = new SeqClient(url);
     clientRef.current = client;
     const detachEnv = client.onEnvelope((env) => store.apply(env));

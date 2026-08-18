@@ -12,11 +12,14 @@ export type { LootRecord };
 // local SQLite read, so this only trips when it is unreachable or wedged.
 const QUERY_TIMEOUT_MS = 10_000;
 
-// ws://host:port -> ws://host:port/loot, preserving wss:// on an https page.
+// ws://host:port[/ws] -> .../loot, preserving wss:// on an https page. A
+// hosted-service session daemon lives under /s/<id>/ws, and its loot history
+// is the sibling /s/<id>/loot — never the origin's root /loot.
 export function lootSocketUrl(daemonWsUrl: string): string {
   try {
     const u = new URL(daemonWsUrl);
-    u.pathname = '/loot';
+    const base = u.pathname.replace(/\/ws\/?$/, '').replace(/\/+$/, '');
+    u.pathname = `${base}/loot`;
     u.search = '';
     u.hash = '';
     return u.toString();

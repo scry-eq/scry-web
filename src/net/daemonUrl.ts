@@ -14,6 +14,22 @@ export function daemonUrl(): string {
 }
 
 /**
+ * A hosted-service session baked into the page URL: `/s/<id>` (the link a
+ * scry-agent prints). The service serves this page and the session's
+ * websocket from one origin, so the daemon URL is derived — same host,
+ * `/s/<id>/ws` — never stored, and it wins over the saved daemon URL:
+ * opening the link IS the session selection.
+ */
+export function sessionUrlFromLocation(
+  loc: Pick<Location, 'pathname' | 'host' | 'protocol'> = window.location,
+): string | null {
+  const m = /^\/s\/([A-Za-z0-9_-]+)/.exec(loc.pathname);
+  if (!m) return null;
+  const scheme = loc.protocol === 'https:' ? 'wss' : 'ws';
+  return `${scheme}://${loc.host}/s/${m[1]}/ws`;
+}
+
+/**
  * `SCRY_DAEMON_URL=...` / `--url ...` from the desktop shell, or null.
  *
  * Wins over the stored value and is written back to it, so it CORRECTS a bad address rather
