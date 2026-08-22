@@ -14,7 +14,9 @@ productName: scry
 # binary inside it is not.
 executableName: scry
 directories:
-  buildResources: build
+  # Keep the application icon in a tracked directory. `build/` is ignored and
+  # cannot supply the icon in a clean checkout.
+  buildResources: artwork/scry-pool-v1
   # NOT the default `dist` — that is the Vite web bundle's output, and Vite
   # empties its outDir on every build, so installers written there are deleted
   # by the next `bun run build`.
