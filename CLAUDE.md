@@ -60,6 +60,18 @@ floating-window/docking system, and the coordinate/con-color conventions.
 - New app-wide settings go into one of the three zustand stores (see
   `docs/architecture.md`), never into `App.tsx` `useState` + ad-hoc
   localStorage.
+- shadcn components are added à la carte (`bunx shadcn@latest add
+  <component>`, style `new-york`, base `neutral`) into
+  `src/components/ui/`; the app is dark-only (variables on `:root`, no
+  `.dark` toggle). Tables default to TanStack Table.
+- `src/ui/concolor.ts` is the con-color source of truth (flat level-delta
+  bands that compress at low player levels; locked by `concolor.test.ts`).
+  `src/ui/skillCaps.ts`'s `findPrimarySpec()` is correct by design — Live
+  never sends a primary-spec flag.
+- **The desktop shell runs on Windows.** A Linux-only run of an
+  Electron/overlay change is unverified — say so, and prefer making the
+  app report its own state (toast/log next to the exe) over asking the
+  user to hunt for logs.
 
 ## Gotchas
 
