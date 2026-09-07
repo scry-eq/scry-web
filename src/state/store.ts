@@ -25,9 +25,8 @@ import type {
   WornSet,
   ZoneServer,
 } from '@gen/seq/v1/events_pb';
-// EQL loot wording (all four dispositions). Shared with the SQLite recorder so
-// the session window and the DB can never disagree about a line.
-import { parseEqlLootMessage } from '../recorder/loot';
+// EQL loot wording, all four dispositions.
+import { parseEqlLootMessage } from '../lib/lootParse';
 
 // One chat-log line: the wire ChatMessage plus the seq the daemon used,
 // so the React render key is stable across re-renders.

@@ -194,7 +194,6 @@ src/gen/        Generated seq.v1 TypeScript bindings
 src/lib/        EQ data tables and client utilities
 src/net/        WebSocket client and daemon URL handling
 src/overlay/    Map and vitals overlay renderers
-src/recorder/   Loot recording and schema code
 src/state/      Live session state, preferences, filters, alerts, and layout
 src/ui/         Main application panels and map
 docs/           Architecture, overlays, and release-signing notes
