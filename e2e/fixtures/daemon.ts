@@ -2,7 +2,6 @@ import type { Page } from '@playwright/test';
 import { create, fromBinary, toBinary } from '@bufbuild/protobuf';
 import {
   EnvelopeSchema,
-  LootPageSchema,
   MapGeometrySchema,
   MapLineSchema,
   SnapshotSchema,
@@ -28,12 +27,6 @@ export const POINTS = [
   { key: 'sp-c', name: 'orc pawn', x: 30, y: 30, z: 0, count: 7 },
   { key: 'sp-a', name: 'a griffon', x: 10, y: 10, z: 0, count: 21 },
   { key: 'sp-b', name: 'Vox', x: 20, y: 20, z: 0, count: 2 },
-];
-
-export const LOOT = [
-  { ts: 300n, itemName: 'Rusty Dagger', itemId: 11, qty: 3, mobName: 'a bat', zoneBase: 'qeynos' },
-  { ts: 100n, itemName: 'Abacus', itemId: 33, qty: 5, mobName: 'Zordak', zoneBase: 'freeport' },
-  { ts: 200n, itemName: 'Mithril Bar', itemId: 22, qty: 2, mobName: 'Vox', zoneBase: 'permafrost' },
 ];
 
 // A box with a diagonal through it — enough strokes that the map has
@@ -108,28 +101,13 @@ function snapshotFrame(opts: DaemonOptions): Uint8Array {
   );
 }
 
-function lootFrame(): Uint8Array {
-  return toBinary(
-    EnvelopeSchema,
-    create(EnvelopeSchema, {
-      seq: 2n,
-      payload: { case: 'lootPage', value: create(LootPageSchema, { rows: LOOT }) },
-    }),
-  );
-}
-
-/**
- * Answer both daemon sockets: the main stream replies to Subscribe with a
- * Snapshot, and /loot replies to a LootQuery with a LootPage.
- */
+/** Answer the daemon socket: reply to Subscribe with a Snapshot. */
 export async function mockDaemon(page: Page, opts: DaemonOptions = {}) {
   await page.routeWebSocket(/localhost:9090/, (ws) => {
-    const isLoot = new URL(ws.url()).pathname === '/loot';
     ws.onMessage((msg) => {
       const bytes = typeof msg === 'string' ? new TextEncoder().encode(msg) : new Uint8Array(msg);
       const kind = fromBinary(ClientEnvelopeSchema, bytes).payload.case;
-      if (!isLoot && kind === 'subscribe') ws.send(Buffer.from(snapshotFrame(opts)));
-      if (isLoot && kind === 'lootQuery') ws.send(Buffer.from(lootFrame()));
+      if (kind === 'subscribe') ws.send(Buffer.from(snapshotFrame(opts)));
     });
   });
 }

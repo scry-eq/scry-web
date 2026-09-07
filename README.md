@@ -69,7 +69,7 @@ cannot be reached.
 - A sortable spawn list with categories, name filters, presets, colors, and
   per-spawn inspection
 - Player, target, group, guild, buff, skill, AA, inventory, and equipment data
-- Chat, combat, experience, loot history, and recorded-loot browsing
+- Chat, combat, experience, and session loot logging
 - Configurable spawn alerts with sound, notifications, and speech
 - Dockable panels, floating windows, resizable side rails, saved layouts, and
   light and dark themes
