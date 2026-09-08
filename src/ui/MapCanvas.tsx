@@ -6,6 +6,8 @@ import { useSpawnFilterStore, passesSpawnFilter } from '../state/spawnFilterStor
 import { classNameOf } from './classes';
 import { conHex, conOf } from './concolor';
 import { formatLoc, runtimeX, runtimeY } from '../lib/coords';
+import { usePrefsStore } from '../state/prefsStore';
+import { autoZWindow, hasAutoZWindow, isDarkFadeZone, makeZAlpha } from '../lib/mapZ';
 
 // Fallback color when con-color isn't applicable: doors/drops have no
 // level, and PC/NPC fall through here only before the player level
@@ -19,6 +21,12 @@ const COLOR_BY_TYPE: Record<number, string> = {
   [SpawnType.DOOR]:       '#c0c0c0',
   [SpawnType.DROP]:       '#ffe066',
 };
+
+// Snap fade opacity to 1/32 so a polyline that fades uniformly still strokes
+// as one path instead of one per segment.
+function quantAlpha(a: number): number {
+  return a <= 0 ? 0 : Math.round(a * 32) / 32;
+}
 
 // Spawn-point "+" color ramp — ports showeq-c's pickSpawnPointColor
 // (mapicon.cpp:1316). With no learned cycle (death or diff unknown) the
@@ -512,6 +520,19 @@ export function MapCanvas({
     localStorage.setItem('map.heightBelow', String(heightBelow));
   }, [heightBelow]);
 
+  // Auto Z / Z fade are app-wide prefs (shared with the overlay window), unlike
+  // the map-local toggles above; the render loop still reads them through refs.
+  const autoZ = usePrefsStore((s) => s.mapAutoZ);
+  const setAutoZ = usePrefsStore((s) => s.setMapAutoZ);
+  const zFade = usePrefsStore((s) => s.mapZFade);
+  const setZFade = usePrefsStore((s) => s.setMapZFade);
+  const zFadePercent = usePrefsStore((s) => s.mapZFadePercent);
+  const setZFadePercent = usePrefsStore((s) => s.setMapZFadePercent);
+  const zFadeRef = useRef(zFade);
+  useEffect(() => { zFadeRef.current = zFade; }, [zFade]);
+  const zFadePercentRef = useRef(zFadePercent);
+  useEffect(() => { zFadePercentRef.current = zFadePercent; }, [zFadePercent]);
+
   // Detect zone change → reset the view (zoom/pan) for the new zone.
   useEffect(() => {
     const z = store.zone();
@@ -565,9 +586,33 @@ export function MapCanvas({
     const hintAbove = geom?.heightHintAbove ?? 0;
     if (hintAbove <= 0) return; // no hint yet — may arrive later this zone
     hintAppliedZoneRef.current = zone;
+    // Latched but not applied while Auto Z owns the band — otherwise turning
+    // Auto Z off would let a stale hint clobber the values mid-zone.
+    if (autoZ) return;
     setHeightAbove(hintAbove);
     setHeightBelow(geom?.heightHintBelow ?? 0);
-  }, [tick, store]);
+  }, [tick, store, autoZ]);
+
+  // Auto Z: re-derive the band once per zone from the client's table, falling
+  // back to the map hint. Unlatched while off, so re-enabling re-applies.
+  const autoZAppliedZoneRef = useRef<string>('');
+  useEffect(() => {
+    if (!autoZ) {
+      autoZAppliedZoneRef.current = '';
+      return;
+    }
+    const zone = store.zone();
+    if (zone === autoZAppliedZoneRef.current) return;
+    const geom = store.map();
+    const hintAbove = geom?.heightHintAbove ?? 0;
+    const hintBelow = geom?.heightHintBelow ?? 0;
+    // Only latch once the answer is final — an unlisted zone's hint can arrive
+    // in a later same-zone update, so keep re-deriving until it does.
+    if (hasAutoZWindow(zone) || hintAbove > 0) autoZAppliedZoneRef.current = zone;
+    const { above, below } = autoZWindow(zone, hintAbove, hintBelow);
+    setHeightAbove(above);
+    setHeightBelow(below);
+  }, [tick, store, autoZ]);
 
   // Sync canvas backing-store size to its container, DPR-aware.
   useEffect(() => {
@@ -785,9 +830,21 @@ export function MapCanvas({
       // no-op so callers can stay branch-light.
       const playerZ = player?.pos?.z;
       const heightOn = heightFilterRef.current && playerZ != null;
+      const fadeOn = heightOn && zFadeRef.current;
       const zMin = heightOn ? playerZ - heightBelowRef.current : -Infinity;
       const zMax = heightOn ? playerZ + heightAboveRef.current : Infinity;
       const inBand = (z: number) => z >= zMin && z <= zMax;
+      // 0..1 opacity for an element spanning [zBottom, zTop]; 0 = skip. Off or
+      // in-band it is 1, so callers can multiply into globalAlpha branch-free.
+      const zAlpha = makeZAlpha({
+        zMin, zMax,
+        below: heightBelowRef.current,
+        above: heightAboveRef.current,
+        fade: fadeOn,
+        fadePercent: zFadePercentRef.current,
+        darkZone: isDarkFadeZone(store.zone()),
+      });
+      const alphaAt = (z: number) => zAlpha(z, z);
 
       // Refresh smoother against the latest store state — adds new ids,
       // retargets moved ids, prunes removed ids. `pos` may be missing on
@@ -930,8 +987,35 @@ export function MapCanvas({
           if (n < 2) continue;
           ctx.strokeStyle = line.color || '#4a6070';
           const zlen = line.z.length;
-          // Per-point Z (M-lines, zlen === n): break the polyline wherever it
-          // leaves the band so only the in-band portion draws.
+          // Per-point Z (M-lines, zlen === n), fading: stroke runs of segments
+          // sharing a quantized alpha, so a flat run stays a single path.
+          if (fadeOn && zlen >= 2) {
+            let runAlpha = -1;
+            let penDown = false;
+            for (let i = 1; i < n; i++) {
+              const z0 = line.z[i - 1], z1 = line.z[i];
+              const a = quantAlpha(zAlpha(Math.min(z0, z1), Math.max(z0, z1)));
+              if (a !== runAlpha) {
+                if (penDown) ctx.stroke();
+                penDown = false;
+                runAlpha = a;
+                if (a > 0) { ctx.globalAlpha = a; ctx.beginPath(); }
+              }
+              if (a <= 0) continue;
+              if (!penDown) {
+                const [ax, ay] = project(line.x[i - 1], line.y[i - 1]);
+                ctx.moveTo(ax, ay);
+                penDown = true;
+              }
+              const [px, py] = project(line.x[i], line.y[i]);
+              ctx.lineTo(px, py);
+            }
+            if (penDown) ctx.stroke();
+            ctx.globalAlpha = 1;
+            continue;
+          }
+          // Per-point Z, clipping: break the polyline wherever it leaves the
+          // band so only the in-band portion draws.
           if (heightOn && zlen >= 2) {
             ctx.beginPath();
             let penDown = false;
@@ -949,7 +1033,9 @@ export function MapCanvas({
           }
           // Single shared Z (L-lines, zlen === 1): whole line in or out. Lines
           // with no Z (zlen === 0) carry no height info and always draw.
-          if (heightOn && zlen === 1 && !inBand(line.z[0])) continue;
+          const lineAlpha = heightOn && zlen === 1 ? alphaAt(line.z[0]) : 1;
+          if (lineAlpha <= 0) continue;
+          ctx.globalAlpha = lineAlpha;
           ctx.beginPath();
           const [sx, sy] = project(line.x[0], line.y[0]);
           ctx.moveTo(sx, sy);
@@ -958,16 +1044,20 @@ export function MapCanvas({
             ctx.lineTo(px, py);
           }
           ctx.stroke();
+          ctx.globalAlpha = 1;
         }
 
         ctx.font = '10px system-ui';
         for (const loc of geom.locations) {
           if (!visible.has(loc.layer)) continue;
           // Locations without a valid Z carry no height info → always show.
-          if (heightOn && loc.zValid && !inBand(loc.z)) continue;
+          const locAlpha = heightOn && loc.zValid ? alphaAt(loc.z) : 1;
+          if (locAlpha <= 0) continue;
           const [lx, ly] = project(loc.x, loc.y);
+          ctx.globalAlpha = locAlpha;
           ctx.fillStyle = loc.color || 'rgba(255,255,255,0.5)';
           ctx.fillText(loc.name, lx + 3, ly);
+          ctx.globalAlpha = 1;
         }
       }
 
@@ -985,13 +1075,16 @@ export function MapCanvas({
         // without any extra timer.
         const spFlash = animNow % 400 < 200;
         for (const sp of store.allSpawnPoints()) {
-          if (heightOn && !inBand(sp.z)) continue;
+          const spAlpha = heightOn ? alphaAt(sp.z) : 1;
+          if (spAlpha <= 0) continue;
           const [px, py] = project(sp.x, sp.y);
+          ctx.globalAlpha = spAlpha;
           ctx.strokeStyle = spawnPointColor(Number(sp.deathTimeS), Number(sp.diffTimeS), spFlash);
           ctx.beginPath();
           ctx.moveTo(px, py - 3); ctx.lineTo(px, py + 3);
           ctx.moveTo(px - 3, py); ctx.lineTo(px + 3, py);
           ctx.stroke();
+          ctx.globalAlpha = 1;
         }
       }
 
@@ -1024,9 +1117,11 @@ export function MapCanvas({
         // always pierces the filter so its dot + the magenta line stay visible
         // even on another floor. Spawns without a position can't be filtered
         // by Z, so they fall through unchanged.
-        if (heightOn && s.pos && s.id !== selId && !inBand(s.pos.z)) continue;
+        const spawnAlpha = heightOn && s.pos && s.id !== selId ? alphaAt(s.pos.z) : 1;
+        if (spawnAlpha <= 0) continue;
         const sp = smoothedPos(s.id, s.pos ?? { x: 0, y: 0 });
         const [px, py] = project(sp.x, sp.y);
+        ctx.globalAlpha = spawnAlpha;
         // Scenery interactivity: doors stay fully out of the hit-test;
         // drops are hoverable (tooltip — "what's on the ground?") but
         // marked non-clickable so they never steal a selection from a
@@ -1133,6 +1228,7 @@ export function MapCanvas({
             ctx.arc(px, py, 3, 0, Math.PI * 2);
             ctx.fill();
         }
+        ctx.globalAlpha = 1;
       }
 
       // Player marker + viewport (FOV ellipse) + view direction (yellow
@@ -1505,27 +1601,69 @@ export function MapCanvas({
             Height filter
           </label>
           {heightFilter && (
-            <div className="flex gap-2 pl-4">
-              <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <span>Above</span>
+            <div className="flex flex-col gap-1 pl-4">
+              <label
+                className="flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground"
+                title="Set the band from the zone instead of the values below"
+              >
                 <input
-                  type="number"
-                  min={0}
-                  value={heightAbove}
-                  onChange={(e) => setHeightAbove(Math.max(0, Number(e.target.value)))}
-                  className="w-12 rounded border border-border bg-bg-alt px-1 py-0.5 text-right tabular-nums text-foreground"
+                  type="checkbox"
+                  checked={autoZ}
+                  onChange={(e) => setAutoZ(e.target.checked)}
+                  className="h-3 w-3 accent-blue-500"
                 />
+                Auto Z
               </label>
-              <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
-                <span>Below</span>
-                <input
-                  type="number"
-                  min={0}
-                  value={heightBelow}
-                  onChange={(e) => setHeightBelow(Math.max(0, Number(e.target.value)))}
-                  className="w-12 rounded border border-border bg-bg-alt px-1 py-0.5 text-right tabular-nums text-foreground"
-                />
-              </label>
+              <div className="flex gap-2">
+                <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <span>Above</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={heightAbove}
+                    disabled={autoZ}
+                    onChange={(e) => setHeightAbove(Math.max(0, Number(e.target.value)))}
+                    className="w-12 rounded border border-border bg-bg-alt px-1 py-0.5 text-right tabular-nums text-foreground disabled:opacity-50"
+                  />
+                </label>
+                <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <span>Below</span>
+                  <input
+                    type="number"
+                    min={0}
+                    value={heightBelow}
+                    disabled={autoZ}
+                    onChange={(e) => setHeightBelow(Math.max(0, Number(e.target.value)))}
+                    className="w-12 rounded border border-border bg-bg-alt px-1 py-0.5 text-right tabular-nums text-foreground disabled:opacity-50"
+                  />
+                </label>
+              </div>
+              <div className="flex items-center gap-2">
+                <label
+                  className="flex cursor-pointer items-center gap-1 text-[11px] text-muted-foreground"
+                  title="Fade out-of-band geometry to a floor opacity instead of hiding it"
+                >
+                  <input
+                    type="checkbox"
+                    checked={zFade}
+                    onChange={(e) => setZFade(e.target.checked)}
+                    className="h-3 w-3 accent-blue-500"
+                  />
+                  Fade
+                </label>
+                <label className="flex items-center gap-1 text-[11px] text-muted-foreground">
+                  <input
+                    type="number"
+                    min={0}
+                    max={100}
+                    value={zFadePercent}
+                    disabled={!zFade}
+                    onChange={(e) => setZFadePercent(Number(e.target.value))}
+                    className="w-12 rounded border border-border bg-bg-alt px-1 py-0.5 text-right tabular-nums text-foreground disabled:opacity-50"
+                  />
+                  <span>%</span>
+                </label>
+              </div>
             </div>
           )}
         </div>
