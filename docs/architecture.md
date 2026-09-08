@@ -150,7 +150,30 @@ it. Apply this to any future filter, not just the existing height filter.
 `useState` + localStorage + ref pattern: the render-loop `useEffect`'s deps
 are `[store]` only, so a toggle change doesn't restart the render loop —
 refs (`showGridRef`, etc.) carry live values into it. Keep new map-local
-toggles in this shape; don't promote them to `usePrefsStore`.
+toggles in this shape; don't promote them to `usePrefsStore`. The exception
+is Auto Z / Z fade (`mapAutoZ`, `mapZFade`, `mapZFadePercent`), which do live
+in `usePrefsStore` so the overlay window shares one setting with the main
+window — they still reach the render loop through refs.
+
+The height filter's two extras are ported from the EQ client's map window and
+their math lives in `src/lib/mapZ.ts`:
+
+- **Auto Z** re-derives the Above/Below band once per zone and disables the
+  inputs. The client keys a fixed table off zone id and writes the same value
+  to both sides; unlisted zones fall back to the client's type byte, which the
+  daemon does not send, so we prefer the map file's own Brewall height hint
+  before the 10/10 default. Re-latches per zone and on re-enable, and the hint
+  prefill stands down while it's on.
+- **Fade** replaces the hard in/out clip with the client's alpha ramp: opaque
+  inside the band, linear to a floor opacity over one more band width, then
+  flat (the divisor floors at 5 so a narrow band still ramps). The floor is
+  quartered in blackburrow/runnyeye/gukbottom, matching the client. Off by
+  default — the clip path is untouched, including its per-point polyline break,
+  because the ramp culls per segment and would join edges the clip splits.
+
+Per-element opacity rides `ctx.globalAlpha`, so every draw site that sets it
+must reset it to 1 before the next one — the FOV ellipse and other `rgba()`
+fills multiply against it.
 
 Static EQ lookup tables live in `src/lib/equipModels.ts` (weapon model
 codes + armor materials — `equipSummary()` produces legacy-style

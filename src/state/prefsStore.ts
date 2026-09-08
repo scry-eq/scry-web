@@ -17,6 +17,13 @@ interface PrefsState {
   // (dead reckoning) instead of easing toward the last-reported position.
   // See PosSmoother in MapCanvas.tsx. No-op while smoothMovement is off.
   predictiveMovement: boolean;
+  // Map height filter: derive the band from the zone instead of the Above/Below
+  // inputs, and fade geometry out of the band instead of clipping it. See
+  // lib/mapZ.ts — both mirror the EQ client's Auto Z / Fade map controls.
+  mapAutoZ: boolean;
+  mapZFade: boolean;
+  /** Residual opacity floor for mapZFade, 0..100. No-op while mapZFade is off. */
+  mapZFadePercent: number;
 
   setSelectOnConsider: (v: boolean) => void;
   setSelectOnTarget: (v: boolean) => void;
@@ -24,6 +31,9 @@ interface PrefsState {
   setTrackPlayer: (v: boolean) => void;
   setSmoothMovement: (v: boolean) => void;
   setPredictiveMovement: (v: boolean) => void;
+  setMapAutoZ: (v: boolean) => void;
+  setMapZFade: (v: boolean) => void;
+  setMapZFadePercent: (v: number) => void;
 }
 
 function readLegacyBool(key: string, fallback: boolean): boolean {
@@ -60,6 +70,9 @@ export const usePrefsStore = create<PrefsState>()(
       trackPlayer:         readLegacyBool('scry.trackPlayer', false),
       smoothMovement:      readLegacyBool('scry.smoothMovement', true),
       predictiveMovement:  readLegacyBool('scry.predictiveMovement', false),
+      mapAutoZ:            false,
+      mapZFade:            false,
+      mapZFadePercent:     20,
 
       setSelectOnConsider:    (v) => set({ selectOnConsider: v }),
       setSelectOnTarget:      (v) => set({ selectOnTarget: v }),
@@ -67,6 +80,9 @@ export const usePrefsStore = create<PrefsState>()(
       setTrackPlayer:         (v) => set({ trackPlayer: v }),
       setSmoothMovement:      (v) => set({ smoothMovement: v }),
       setPredictiveMovement:  (v) => set({ predictiveMovement: v }),
+      setMapAutoZ:            (v) => set({ mapAutoZ: v }),
+      setMapZFade:            (v) => set({ mapZFade: v }),
+      setMapZFadePercent:     (v) => set({ mapZFadePercent: Math.min(100, Math.max(0, Math.round(v))) }),
     }),
     {
       name: 'scry.prefs',
@@ -79,6 +95,9 @@ export const usePrefsStore = create<PrefsState>()(
         trackPlayer:         state.trackPlayer,
         smoothMovement:      state.smoothMovement,
         predictiveMovement:  state.predictiveMovement,
+        mapAutoZ:            state.mapAutoZ,
+        mapZFade:            state.mapZFade,
+        mapZFadePercent:     state.mapZFadePercent,
       }),
     },
   ),

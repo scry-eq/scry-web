@@ -30,6 +30,10 @@ describe('prefsStore — defaults', () => {
     expect(s.smoothMovement).toBe(true);
     // predictiveMovement is an opt-in variant of smoothing — off by default.
     expect(s.predictiveMovement).toBe(false);
+    // Map height-filter extras are opt-in; off leaves the legacy hard clip.
+    expect(s.mapAutoZ).toBe(false);
+    expect(s.mapZFade).toBe(false);
+    expect(s.mapZFadePercent).toBe(20);
   });
 });
 
@@ -71,6 +75,9 @@ describe('prefsStore — actions', () => {
     s.setTrackPlayer(true);
     s.setSmoothMovement(false);
     s.setPredictiveMovement(true);
+    s.setMapAutoZ(true);
+    s.setMapZFade(true);
+    s.setMapZFadePercent(140);
     const after = usePrefsStore.getState();
     expect(after.selectOnConsider).toBe(true);
     expect(after.selectOnTarget).toBe(true);
@@ -78,6 +85,10 @@ describe('prefsStore — actions', () => {
     expect(after.trackPlayer).toBe(true);
     expect(after.smoothMovement).toBe(false);
     expect(after.predictiveMovement).toBe(true);
+    expect(after.mapAutoZ).toBe(true);
+    expect(after.mapZFade).toBe(true);
+    // setMapZFadePercent clamps to 0..100.
+    expect(after.mapZFadePercent).toBe(100);
   });
 
   it('persists state changes into scry.prefs', async () => {
