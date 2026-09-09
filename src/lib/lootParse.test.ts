@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseEqlLootMessage, parseMoneyToCopper, normalizeMob, splitZoneInstance } from './loot';
+import { parseEqlLootMessage, parseMoneyToCopper, normalizeMob, splitZoneInstance } from './lootParse';
 
 // All strings below are verbatim distinct color-286 lines from the committed
 // eql-fighting fixture (see the enumeration used to derive the two families).

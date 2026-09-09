@@ -1,7 +1,7 @@
 import { expect, test, type Locator, type Page } from '@playwright/test';
-import { LOOT, POINTS, SPAWNS, mockDaemon } from './fixtures/daemon';
+import { POINTS, SPAWNS, mockDaemon } from './fixtures/daemon';
 
-// The three TanStack tables — Spawns, Spawn Points and the Loot browser —
+// The two TanStack tables — Spawns and Spawn Points —
 // driven by real seq.v1 frames over a mocked daemon socket, so sorting and
 // resizing are exercised against actual rows. The panel suite renders these
 // panels but never looks inside them.
@@ -167,39 +167,5 @@ test.describe('Spawn Points table', () => {
     await dragGrip(page, name, 50);
 
     expect((await name.boundingBox())!.width).toBeGreaterThan(before.width + 15);
-  });
-});
-
-test.describe('Loot browser table', () => {
-  // Scoped by a header only this table has — the rail panels keep their own
-  // tables mounted behind the loot view.
-  async function lootTable(page: Page): Promise<Locator> {
-    await page.getByRole('button', { name: 'loot', exact: true }).click();
-    const table = page.locator('table').filter({ has: page.locator('thead th', { hasText: 'Mob' }) });
-    await expect(rowsOf(table)).toHaveCount(LOOT.length);
-    return table;
-  }
-
-  test('renders the loot page', async ({ page }) => {
-    const table = await lootTable(page);
-    await expect(table.getByText('Mithril Bar')).toBeVisible();
-    // Default sort is newest-first, so the fixture's ts=300 row leads.
-    expect((await columnValues(table, 'Item'))[0]).toContain('Rusty Dagger');
-  });
-
-  test('clicking Item sorts by name', async ({ page }) => {
-    const table = await lootTable(page);
-    // The whole <th> is the sort target here, not an inner span.
-    await table.locator('thead th').filter({ hasText: 'Item' }).first().click();
-    expectOrdered(await columnValues(table, 'Item'), byText);
-  });
-
-  test('clicking Qty sorts numerically', async ({ page }) => {
-    const table = await lootTable(page);
-    await table.locator('thead th').filter({ hasText: 'Qty' }).first().click();
-
-    const qty = await columnValues(table, 'Qty');
-    expect(qty.map(Number).sort((a, b) => a - b)).toEqual([2, 3, 5]);
-    expectOrdered(qty, byNumber);
   });
 });

@@ -1,38 +1,5 @@
-// Pure, I/O-free loot helpers: parse EQL loot lines, normalize mob names, split
-// the EQL instance suffix off a zone, sum coin. Unit-tested in loot.test.ts and
-// consumed by the host-agnostic recorder core (core.ts), so it must stay free of
-// WebSocket / SQLite / Bun / Node imports.
-
-// 'coin' rows are corpse coin piles: itemName is 'Coin' and money_copper
-// carries the amount.
-export type LootSource = 'message' | 'window' | 'coin';
-
-// One persisted loot event. `source='message'` is the authoritative "loot I
-// acquired" record (with disposition + money); `source='window'` is the corpse
-// contents / drop-table view (with icon + corpse id). `item_id` stays null until
-// the daemon parses it out of the item-link header (a follow-up).
-export interface LootRow {
-  ts: number;                 // epoch ms
-  source: LootSource;
-  itemName: string;
-  itemId: number | null;
-  icon: number | null;
-  qty: number;
-  mobName: string;            // raw, e.g. "an ice giant"
-  mobNorm: string;            // article-stripped, lowercased — grouping key
-  corpseId: number | null;
-  zoneShort: string;
-  zoneBase: string;           // instance suffix stripped
-  instance: string;           // '', 'solo', 'multi', 'eqlraidgroup'
-  sold: 0 | 1;
-  moneyCopper: number;        // sale proceeds
-  disposition: string | null; // 'inventory' | 'sold' | 'created' | storage dest | null
-  looter: string;
-}
-
-export interface LootSink {
-  write(rows: LootRow[]): void;
-}
+// Pure, I/O-free EQL loot-line helpers: parse loot messages, normalize mob
+// names, split the instance suffix off a zone, sum coin.
 
 export interface ParsedLoot {
   item: string;

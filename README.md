@@ -69,7 +69,7 @@ cannot be reached.
 - A sortable spawn list with categories, name filters, presets, colors, and
   per-spawn inspection
 - Player, target, group, guild, buff, skill, AA, inventory, and equipment data
-- Chat, combat, experience, loot history, and recorded-loot browsing
+- Chat, combat, experience, and session loot logging
 - Configurable spawn alerts with sound, notifications, and speech
 - Dockable panels, floating windows, resizable side rails, saved layouts, and
   light and dark themes
@@ -194,7 +194,6 @@ src/gen/        Generated seq.v1 TypeScript bindings
 src/lib/        EQ data tables and client utilities
 src/net/        WebSocket client and daemon URL handling
 src/overlay/    Map and vitals overlay renderers
-src/recorder/   Loot recording and schema code
 src/state/      Live session state, preferences, filters, alerts, and layout
 src/ui/         Main application panels and map
 docs/           Architecture, overlays, and release-signing notes

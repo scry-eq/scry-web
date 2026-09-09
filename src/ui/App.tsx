@@ -37,7 +37,6 @@ import { LootHistoryPanel } from './LootHistoryPanel';
 import { FilterRulesPanel } from './FilterRulesPanel';
 import { GroupPanel } from './GroupPanel';
 import { MapCanvas } from './MapCanvas';
-import { LootBrowser } from './LootBrowser';
 import { Panel } from './Panel';
 import { PreferencesPanel } from './PreferencesPanel';
 import { RailDivider, CollapsedRail } from './RailDivider';
@@ -175,8 +174,6 @@ export function App() {
   // Panel layout state lives in the zustand store so unrelated
   // re-renders (e.g. tick churn) don't have to thread its setters
   // through every callback.
-  const viewMode     = useLayoutStore((s) => s.viewMode);
-  const setViewMode  = useLayoutStore((s) => s.setViewMode);
   const visibility   = useLayoutStore((s) => s.visibility);
   const dockLocation = useLayoutStore((s) => s.dockLocation);
   const panelOrder   = useLayoutStore((s) => s.panelOrder);
@@ -464,9 +461,6 @@ export function App() {
         p.value.activeBoxId,
       );
     });
-    // Tauri desktop: record loot in-app off this same envelope stream (the
-    // packaged app has no standalone Bun recorder). No-ops in the browser build.
-    // The sink DB is chosen per backend from the first Snapshot's data namespace.
 
     const ws = { detach: () => { client.close(); detachEnv(); detachSelect(); detachAlert(); detachBoxes(); } };
 
@@ -580,22 +574,6 @@ export function App() {
         />
         <div className="ml-auto flex items-center gap-2">
           <OverlayToggle />
-          <div className="flex h-6 overflow-hidden rounded border border-border">
-            {(['map', 'loot'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setViewMode(m)}
-                className={`px-2 text-xs font-medium capitalize select-none ${
-                  viewMode === m
-                    ? 'bg-primary text-primary-foreground'
-                    : 'bg-bg-alt text-muted-foreground hover:text-foreground'
-                }`}
-              >
-                {m}
-              </button>
-            ))}
-          </div>
           <Menubar className="h-6">
             <button
               type="button"
@@ -762,22 +740,18 @@ export function App() {
           />
         )}
         <div className="min-w-[300px] flex-1">
-          {viewMode === 'loot' ? (
-            <LootBrowser daemonUrl={url} />
-          ) : (
-            <MapCanvas
-              store={store}
-              client={clientRef.current}
-              tick={tick}
-              selectedId={selectedId}
-              selectVersion={selectVersion}
-              onSelect={onSelect}
-              trackPlayer={trackPlayer}
-              smoothMovement={smoothMovement}
-              predictiveMovement={predictiveMovement}
-              panToXY={panToXY}
-            />
-          )}
+          <MapCanvas
+            store={store}
+            client={clientRef.current}
+            tick={tick}
+            selectedId={selectedId}
+            selectVersion={selectVersion}
+            onSelect={onSelect}
+            trackPlayer={trackPlayer}
+            smoothMovement={smoothMovement}
+            predictiveMovement={predictiveMovement}
+            panToXY={panToXY}
+          />
         </div>
         {!showRightRail && rightHasPanels && (
           <CollapsedRail
